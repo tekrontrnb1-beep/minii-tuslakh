@@ -996,10 +996,14 @@ document.getElementById('enable-notif').onclick = requestNotifPermission;
 
 // Web Audio beep (no asset needed)
 let audioCtx;
+function getCtx() {
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
 function beep() {
   try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    getCtx();
     const now = audioCtx.currentTime;
     for (let i = 0; i < 3; i++) {
       const o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -1018,7 +1022,9 @@ function beep() {
 const ALARM_NAME_KEY = 'tuslakh-alarm-name';
 const alarmName = () => localStorage.getItem(ALARM_NAME_KEY) || 'Анхдагч дуу (beep)';
 const hasCustomAlarm = () => !!localStorage.getItem(ALARM_NAME_KEY);
-let alarmUrl = null;
+let alarmBuffer = null;       // decoded audio for in-app playback (no media notification)
+let alarmSource = null;       // currently-playing source (so we can stop it)
+const ALARM_MAX_SEC = 30;     // cap so a long song doesn't blast forever
 
 function idbOpen() {
   return new Promise((res, rej) => {
@@ -1051,19 +1057,31 @@ function idbDel(key) {
 }
 
 async function loadAlarmSound() {
+  alarmBuffer = null;
   try {
     const blob = await idbGet('alarmSound');
-    if (blob) { if (alarmUrl) URL.revokeObjectURL(alarmUrl); alarmUrl = URL.createObjectURL(blob); }
-  } catch (e) { /* ignore */ }
+    if (blob) {
+      const arr = await blob.arrayBuffer();
+      alarmBuffer = await getCtx().decodeAudioData(arr);
+    }
+  } catch (e) { alarmBuffer = null; }
 }
 
+// Plays via Web Audio (a sound effect) so Android shows NO media-player
+// notification — the sound stays inside the app. Falls back to the beep.
 function playAlarm() {
-  if (alarmUrl) {
+  if (alarmBuffer) {
     try {
-      const a = new Audio(alarmUrl);
-      a.play().catch(() => beep());
+      const ctx = getCtx();
+      if (alarmSource) { try { alarmSource.stop(); } catch (e) { } }
+      const src = ctx.createBufferSource();
+      src.buffer = alarmBuffer;
+      src.connect(ctx.destination);
+      src.start();
+      src.stop(ctx.currentTime + Math.min(alarmBuffer.duration, ALARM_MAX_SEC));
+      alarmSource = src;
       return;
-    } catch (e) { /* fall through */ }
+    } catch (e) { /* fall through to beep */ }
   }
   beep();
 }
@@ -1091,7 +1109,7 @@ function pickAlarmSound(onDone) {
 async function resetAlarmSound(onDone) {
   try { await idbDel('alarmSound'); } catch (e) { /* ignore */ }
   localStorage.removeItem(ALARM_NAME_KEY);
-  if (alarmUrl) { URL.revokeObjectURL(alarmUrl); alarmUrl = null; }
+  alarmBuffer = null;
   if (typeof onDone === 'function') onDone();
   toast('Анхдагч дуу болголоо');
 }

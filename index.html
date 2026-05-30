@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <title>Миний Туслах</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/icon.svg" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Миний Туслах" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div>
+        <h1 id="header-title">Өнөөдөр</h1>
+        <div class="header-date" id="header-date"></div>
+      </div>
+      <button class="avatar-btn" id="avatar-btn" title="Профайл">?</button>
+    </div>
+  </header>
+
+  <!-- Main content -->
+  <main id="main">
+    <!-- TODAY / DASHBOARD -->
+    <section class="view active" id="view-today">
+      <div class="hero-card">
+        <div class="hero-greeting" id="hero-greeting">Сайн байна уу!</div>
+        <div class="hero-sub" id="hero-sub"></div>
+        <div class="hero-stats">
+          <div class="stat" data-perm="tasks"><span class="stat-num" id="stat-tasks">0</span><span class="stat-label">Даалгавар</span></div>
+          <div class="stat" data-perm="habits"><span class="stat-num" id="stat-habits">0</span><span class="stat-label">Зуршил</span></div>
+          <div class="stat" data-perm="reminders"><span class="stat-num" id="stat-reminders">0</span><span class="stat-label">Сэрүүлэг</span></div>
+        </div>
+      </div>
+
+      <div class="weather-card" id="weather-card"></div>
+
+      <div data-perm="tasks">
+        <div class="section-head">
+          <h2>Өнөөдрийн даалгавар</h2>
+          <button class="link-btn" data-goto="tasks">Бүгд →</button>
+        </div>
+        <div class="quick-add">
+          <input id="qa-today" placeholder="Шинэ даалгавар бичээд Enter дарна уу..." maxlength="120"/>
+          <button id="qa-today-btn">+</button>
+        </div>
+        <ul class="task-list" id="today-tasks"></ul>
+      </div>
+
+      <div data-perm="habits">
+        <div class="section-head">
+          <h2>Зуршил</h2>
+          <button class="link-btn" data-goto="habits">Бүгд →</button>
+        </div>
+        <div class="habit-quick" id="today-habits"></div>
+      </div>
+
+      <div data-perm="reminders">
+        <div class="section-head">
+          <h2>Удахгүй болох сэрүүлэг</h2>
+          <button class="link-btn" data-goto="reminders">Бүгд →</button>
+        </div>
+        <ul class="reminder-list" id="today-reminders"></ul>
+      </div>
+    </section>
+
+    <!-- TASKS -->
+    <section class="view" id="view-tasks">
+      <div class="date-strip" id="date-strip"></div>
+      <div class="quick-add">
+        <input id="qa-tasks" placeholder="Энэ өдөрт даалгавар нэмэх..." maxlength="120"/>
+        <button id="qa-tasks-btn">+</button>
+      </div>
+      <div class="filter-row">
+        <button class="chip active" data-filter="all">Бүгд</button>
+        <button class="chip" data-filter="active">Хийгдээгүй</button>
+        <button class="chip" data-filter="done">Дууссан</button>
+      </div>
+      <ul class="task-list" id="task-list"></ul>
+      <div class="empty" id="task-empty" hidden>Энэ өдөр даалгавар алга. <br/>+ товчоор нэмээрэй.</div>
+    </section>
+
+    <!-- CALENDAR -->
+    <section class="view" id="view-calendar">
+      <div class="cal-head">
+        <button class="cal-nav" id="cal-prev">‹</button>
+        <div class="cal-title" id="cal-title"></div>
+        <button class="cal-nav" id="cal-next">›</button>
+      </div>
+      <div class="cal-weekdays">
+        <span>Да</span><span>Мя</span><span>Лх</span><span>Пү</span><span>Ба</span><span>Бя</span><span>Ня</span>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+      <div class="cal-day-detail" id="cal-day-detail">
+        <h3 id="cal-day-title">Өдөр сонгоно уу</h3>
+        <ul class="task-list" id="cal-day-items"></ul>
+      </div>
+    </section>
+
+    <!-- HABITS -->
+    <section class="view" id="view-habits">
+      <div class="habit-summary" id="habit-summary"></div>
+      <div id="habit-container"></div>
+      <div class="empty" id="habit-empty" hidden>Зуршил алга байна.<br/>+ товчоор шинэ зуршил нэмээрэй.</div>
+    </section>
+
+    <!-- REMINDERS -->
+    <section class="view" id="view-reminders">
+      <div class="notice" id="notif-notice" hidden>
+        <span>🔔 Сэрүүлэг ажиллахын тулд мэдэгдэл зөвшөөрнө үү.</span>
+        <button class="mini-btn" id="enable-notif">Зөвшөөрөх</button>
+      </div>
+      <ul class="reminder-list" id="reminder-list"></ul>
+      <div class="empty" id="reminder-empty" hidden>Сэрүүлэг алга байна.<br/>+ товчоор нэмээрэй.</div>
+    </section>
+
+    <!-- PROFILE / SETTINGS -->
+    <section class="view" id="view-profile"></section>
+  </main>
+
+  <!-- Floating add button -->
+  <button class="fab" id="fab">+</button>
+
+  <!-- Bottom navigation -->
+  <nav class="tabbar">
+    <button class="tab active" data-view="today">
+      <span class="tab-ico">🏠</span><span class="tab-lbl">Өнөөдөр</span>
+    </button>
+    <button class="tab" data-view="tasks">
+      <span class="tab-ico">✓</span><span class="tab-lbl">Даалгавар</span>
+    </button>
+    <button class="tab" data-view="calendar">
+      <span class="tab-ico">📅</span><span class="tab-lbl">Календар</span>
+    </button>
+    <button class="tab" data-view="habits">
+      <span class="tab-ico">🔥</span><span class="tab-lbl">Зуршил</span>
+    </button>
+    <button class="tab" data-view="reminders">
+      <span class="tab-ico">🔔</span><span class="tab-lbl">Сэрүүлэг</span>
+    </button>
+  </nav>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modal-overlay" hidden>
+    <div class="modal" id="modal">
+      <div class="modal-head">
+        <h3 id="modal-title">Нэмэх</h3>
+        <button class="modal-close" id="modal-close">✕</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" hidden></div>
+
+  <!-- Auth screen (login / first-run setup) -->
+  <div class="auth-screen" id="auth-screen" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

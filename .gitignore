@@ -1,0 +1,10 @@
+# Editor / harness config
+.claude/
+
+# Exported user backups (contain personal data)
+minii-tuslakh-*.json
+
+# OS files
+Thumbs.db
+desktop.ini
+.DS_Store

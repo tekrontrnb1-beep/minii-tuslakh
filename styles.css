@@ -439,6 +439,10 @@ body {
 .time-chip { background: var(--primary-tint); border: 1px solid var(--primary); color: var(--text); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .time-chip b { color: var(--muted); margin-left: 4px; font-weight: 700; }
 .time-add { background: var(--primary); color: #fff; border: none; border-radius: 12px; padding: 0 16px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.sound-row { display: flex; align-items: center; gap: 8px; }
+.sound-row .sr-snd-name { flex: 1; min-width: 0; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 14px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sound-row .time-add { padding: 12px 16px; }
+.snd-play { background: var(--card-2); border: 1px solid var(--line); color: var(--text); border-radius: 12px; width: 46px; height: 44px; font-size: 16px; cursor: pointer; flex-shrink: 0; }
 .emoji-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .emoji-row button { width: 44px; height: 44px; font-size: 22px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
 .emoji-row button.active { border-color: var(--primary); background: var(--primary-tint); }

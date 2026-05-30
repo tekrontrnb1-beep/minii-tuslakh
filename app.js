@@ -806,10 +806,19 @@ function openReminderModal(rem) {
       </div></div>
     <div class="field" id="date-field" ${rep === 'none' ? '' : 'hidden'}><label>Огноо</label>
       <input id="f-date" type="date" value="${rem && rem.date ? rem.date : todayYmd()}"/></div>
+    <div class="field"><label>Сэрүүлгийн дуу</label>
+      <div class="sound-row">
+        <span class="sr-snd-name" id="rm-snd-name">🎵 ${esc(alarmName())}</span>
+        <button type="button" class="time-add" id="rm-snd-pick">Сонгох</button>
+        <button type="button" class="snd-play" id="rm-snd-play">▶</button>
+      </div></div>
     <button class="btn-primary" id="f-save">${editing ? 'Хадгалах' : 'Нэмэх'}</button>`;
   segHandler('f-rep', (v) => {
     document.getElementById('date-field').hidden = (v !== 'none');
   });
+  const refreshSnd = () => { const el = document.getElementById('rm-snd-name'); if (el) el.textContent = '🎵 ' + alarmName(); };
+  document.getElementById('rm-snd-pick').onclick = () => pickAlarmSound(refreshSnd);
+  document.getElementById('rm-snd-play').onclick = playAlarm;
   document.getElementById('f-save').onclick = () => {
     const title = val('f-title').trim();
     if (!title) { toast('Нэр оруулна уу'); return; }
@@ -1054,7 +1063,7 @@ function playAlarm() {
   beep();
 }
 
-function pickAlarmSound() {
+function pickAlarmSound(onDone) {
   const inp = document.createElement('input');
   inp.type = 'file';
   inp.accept = 'audio/*';
@@ -1066,6 +1075,7 @@ function pickAlarmSound() {
       await idbSet('alarmSound', file);
       localStorage.setItem(ALARM_NAME_KEY, file.name);
       await loadAlarmSound();
+      if (typeof onDone === 'function') onDone();
       render();
       toast('🎵 Дуу хадгаллаа');
     } catch (e) { toast('Хадгалахад алдаа гарлаа'); }
@@ -1570,12 +1580,16 @@ function renderProfile() {
   let html = `
     <div class="profile-card">
       <div class="pc-avatar">${initials(u.name)}</div>
-      <div class="pc-name">${esc(u.name)}</div>
+      <div class="pc-name">${esc(((u.lastName ? u.lastName + ' ' : '') + u.name))}</div>
       <div class="pc-user">@${esc(u.username)}${u.email ? ' · 📧 ' + esc(u.email) : ''}</div>
+      ${u.birthday ? `<div class="pc-user">🎂 ${fmtBirthday(u.birthday)}</div>` : ''}
       <span class="role-badge ${isAdmin ? 'role-admin' : 'role-user'}">${isAdmin ? '👑 Админ' : 'Хэрэглэгч'}</span>
     </div>
     <div class="settings-group">
       <div class="sg-title">Бүртгэл</div>
+      <div class="settings-row" id="pf-edit">
+        <span class="sr-ico">👤</span><div class="sr-main"><div class="sr-label">Бүртгэл засах</div><div class="sr-sub">Овог, нэр, төрсөн огноо</div></div><span class="sr-arrow">›</span>
+      </div>
       <div class="settings-row" id="pf-pass">
         <span class="sr-ico">🔑</span><div class="sr-main"><div class="sr-label">Нууц үг солих</div></div><span class="sr-arrow">›</span>
       </div>
@@ -1618,12 +1632,13 @@ function renderProfile() {
       <div id="pf-users">${auth.users.map(userRowHtml).join('')}</div>`;
   }
   v.innerHTML = html;
+  document.getElementById('pf-edit').onclick = openProfileEdit;
   document.getElementById('pf-pass').onclick = openChangePw;
   document.getElementById('pf-logout').onclick = () => { if (confirm('Системээс гарах уу?')) logout(); };
   const onIf = (id, h) => { const el = document.getElementById(id); if (el) el.onclick = h; };
   onIf('pf-export', exportData);
   onIf('pf-import', importData);
-  onIf('pf-sound-pick', pickAlarmSound);
+  onIf('pf-sound-pick', () => pickAlarmSound());
   onIf('pf-sound-play', playAlarm);
   onIf('pf-sound-reset', resetAlarmSound);
   segHandler('pf-theme', v => setTheme(v));
@@ -1704,6 +1719,31 @@ function importData() {
     reader.readAsText(file);
   };
   inp.click();
+}
+
+function fmtBirthday(s) {
+  if (!s) return '';
+  const d = parseYmd(s);
+  return `${d.getFullYear()} оны ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+}
+
+function openProfileEdit() {
+  const u = currentUser;
+  modalTitle.textContent = 'Бүртгэл засах';
+  modalBody.innerHTML = `
+    <div class="field"><label>Овог</label><input id="pe-last" value="${esc(u.lastName || '')}" placeholder="Жишээ: Бат"/></div>
+    <div class="field"><label>Нэр</label><input id="pe-name" value="${esc(u.name || '')}" placeholder="Жишээ: Болд"/></div>
+    <div class="field"><label>Төрсөн огноо</label><input id="pe-bday" type="date" value="${u.birthday || ''}"/></div>
+    <button class="btn-primary" id="pe-save">Хадгалах</button>`;
+  document.getElementById('pe-save').onclick = () => {
+    const name = val('pe-name').trim();
+    if (!name) { toast('Нэр оруулна уу'); return; }
+    u.lastName = val('pe-last').trim();
+    u.name = name;
+    u.birthday = val('pe-bday');
+    saveAuth(); closeModal(); updateAvatar(); render(); toast('Хадгаллаа');
+  };
+  openModal();
 }
 
 function openChangePw() {

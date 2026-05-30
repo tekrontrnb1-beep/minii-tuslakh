@@ -554,10 +554,12 @@ function habitCard(h, days, t) {
   head.innerHTML = `<div class="hc-ico">${h.icon}</div>
     <div class="hc-info"><div class="hc-name">${esc(h.name)}</div>
     <div class="hc-streak">🔥 ${streak(h)} өдөр ${neg ? 'тэвчсэн' : 'дараалан'}</div>${timesLine}</div>
-    <button class="task-del st-btn">📊</button>
-    <button class="task-del">🗑</button>`;
-  head.querySelector('.st-btn').onclick = () => openHabitStats(h);
-  head.querySelector('.task-del:not(.st-btn)').onclick = () => {
+    <button class="task-del hd-edit">✏️</button>
+    <button class="task-del hd-stats">📊</button>
+    <button class="task-del hd-del">🗑</button>`;
+  head.querySelector('.hd-edit').onclick = () => openHabitModal(h);
+  head.querySelector('.hd-stats').onclick = () => openHabitStats(h);
+  head.querySelector('.hd-del').onclick = () => {
     if (!confirm(`"${h.name}" зуршлыг устгах уу?`)) return;
     state.habits = state.habits.filter(x => x.id !== h.id); save(); render(); toast('Зуршил устлаа');
   };
@@ -680,20 +682,24 @@ function openTaskModal(task) {
 
 /* ---- Habit modal ---- */
 const HABIT_ICONS = ['💧', '🏃', '📚', '🧘', '💪', '🥗', '😴', '✍️', '🎯', '🧹', '💊', '🚭', '🍔', '🍺', '📱', '🎮'];
-function openHabitModal() {
-  modalTitle.textContent = 'Шинэ зуршил';
-  let htype = 'positive';
-  let htimes = [];
+function openHabitModal(habit) {
+  const editing = !!habit;
+  modalTitle.textContent = editing ? 'Зуршил засах' : 'Шинэ зуршил';
+  let htype = editing ? (habit.type || 'positive') : 'positive';
+  let htimes = editing ? [...(habit.times || [])] : [];
+  const typeHint = (t) => t === 'negative'
+    ? 'Тэвчсэн (хийгээгүй) өдрийг тэмдэглэнэ (жишээ: тамхи татахгүй, хурдан хоол идэхгүй)'
+    : 'Хийсэн өдрийг тэмдэглэнэ (жишээ: ус уух, дасгал хийх)';
   modalBody.innerHTML = `
     <div class="field"><label>Төрөл</label>
       <div class="seg" id="f-type">
-        <button data-v="positive" class="active">✅ Эерэг</button>
-        <button data-v="negative">🚫 Сөрөг</button>
+        <button data-v="positive" class="${htype === 'positive' ? 'active' : ''}">✅ Эерэг</button>
+        <button data-v="negative" class="${htype === 'negative' ? 'active' : ''}">🚫 Сөрөг</button>
       </div>
-      <div id="f-type-hint" style="font-size:12px;color:var(--muted);margin-top:7px">Хийсэн өдрийг тэмдэглэнэ (жишээ: ус уух, дасгал хийх)</div>
+      <div id="f-type-hint" style="font-size:12px;color:var(--muted);margin-top:7px">${typeHint(htype)}</div>
     </div>
     <div class="field"><label>Зуршлын нэр</label>
-      <input id="f-name" placeholder="Жишээ: Ам угаах"/></div>
+      <input id="f-name" placeholder="Жишээ: Ам угаах" value="${editing ? esc(habit.name) : ''}"/></div>
     <div class="field"><label>Сануулах цаг (заавал биш)</label>
       <div class="time-chips" id="f-times"></div>
       <div style="display:flex;gap:8px;margin-top:8px">
@@ -704,15 +710,13 @@ function openHabitModal() {
     </div>
     <div class="field"><label>Дүрс сонгох</label>
       <div class="emoji-row" id="f-icon">
-        ${HABIT_ICONS.map((e, i) => `<button data-v="${e}" class="${i === 0 ? 'active' : ''}">${e}</button>`).join('')}
+        ${HABIT_ICONS.map((e, i) => `<button data-v="${e}" class="${(editing ? habit.icon === e : i === 0) ? 'active' : ''}">${e}</button>`).join('')}
       </div></div>
-    <button class="btn-primary" id="f-save">Нэмэх</button>`;
+    <button class="btn-primary" id="f-save">${editing ? 'Хадгалах' : 'Нэмэх'}</button>`;
   emojiHandler('f-icon');
   segHandler('f-type', v => {
     htype = v;
-    document.getElementById('f-type-hint').textContent = v === 'negative'
-      ? 'Тэвчсэн (хийгээгүй) өдрийг тэмдэглэнэ (жишээ: тамхи татахгүй, хурдан хоол идэхгүй)'
-      : 'Хийсэн өдрийг тэмдэглэнэ (жишээ: ус уух, дасгал хийх)';
+    document.getElementById('f-type-hint').textContent = typeHint(v);
   });
 
   function renderTimes() {
@@ -734,8 +738,12 @@ function openHabitModal() {
   document.getElementById('f-save').onclick = () => {
     const name = val('f-name').trim();
     if (!name) { toast('Нэр оруулна уу'); return; }
-    state.habits.push({ id: uid(), name, icon: emojiVal('f-icon'), type: htype, times: htimes, history: {} });
-    save(); closeModal(); render(); toast('Зуршил нэмлээ');
+    if (editing) {
+      Object.assign(habit, { name, icon: emojiVal('f-icon'), type: htype, times: htimes });
+    } else {
+      state.habits.push({ id: uid(), name, icon: emojiVal('f-icon'), type: htype, times: htimes, history: {} });
+    }
+    save(); closeModal(); render(); toast(editing ? 'Хадгаллаа' : 'Зуршил нэмлээ');
     if (htimes.length) requestNotifPermission();
   };
   openModal();

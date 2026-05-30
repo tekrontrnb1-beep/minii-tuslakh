@@ -1077,17 +1077,18 @@ async function loadAlarmSound() {
 
 // Plays via Web Audio (a sound effect) so Android shows NO media-player
 // notification — the sound stays inside the app. Falls back to the beep.
-function playAlarm() {
+function playAlarm(loop) {
   if (alarmBuffer) {
     try {
       const ctx = getCtx();
       if (alarmSource) { try { alarmSource.stop(); } catch (e) { } }
       const src = ctx.createBufferSource();
       src.buffer = alarmBuffer;
+      src.loop = !!loop;
       src.connect(ctx.destination);
       src.onended = () => { if (alarmSource === src) alarmSource = null; };
       src.start();
-      src.stop(ctx.currentTime + Math.min(alarmBuffer.duration, ALARM_MAX_SEC));
+      if (!loop) src.stop(ctx.currentTime + Math.min(alarmBuffer.duration, ALARM_MAX_SEC));
       alarmSource = src;
       return;
     } catch (e) { /* fall through to beep */ }
@@ -1097,6 +1098,34 @@ function playAlarm() {
 
 function stopAlarm() {
   if (alarmSource) { try { alarmSource.stop(); } catch (e) { /* ignore */ } alarmSource = null; }
+}
+
+/* ---- Ringing (loops sound + repeats beep until dismissed) ---- */
+let beepInterval = null, ringAutoStop = null;
+function startRing() {
+  stopRing();
+  if (alarmBuffer) { playAlarm(true); }
+  else { beep(); beepInterval = setInterval(beep, 1600); }
+  if (navigator.vibrate) navigator.vibrate([300, 200, 300, 200, 300]);
+  ringAutoStop = setTimeout(dismissAlarm, 60000); // safety: auto-stop after 60s
+}
+function stopRing() {
+  stopAlarm();
+  if (beepInterval) { clearInterval(beepInterval); beepInterval = null; }
+  if (ringAutoStop) { clearTimeout(ringAutoStop); ringAutoStop = null; }
+}
+
+/* ---- Ringing alarm overlay (with Stop button) ---- */
+function showAlarmOverlay(title, sub) {
+  const o = document.getElementById('alarm-overlay');
+  document.getElementById('alarm-title').textContent = title;
+  document.getElementById('alarm-sub').textContent = sub || '';
+  o.hidden = false;
+}
+function dismissAlarm() {
+  stopRing();
+  const o = document.getElementById('alarm-overlay');
+  if (o) o.hidden = true;
 }
 
 function pickAlarmSound(onDone) {
@@ -1137,9 +1166,8 @@ function fireReminder(r) {
       n.onclick = () => { window.focus(); n.close(); };
     } catch (e) { /* some browsers need SW notifications */ }
   }
-  playAlarm();
-  toast('🔔 ' + r.title);
-  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  startRing();
+  showAlarmOverlay('🔔 ' + r.title, `Сэрүүлгийн цаг боллоо · ${r.time}`);
 }
 
 // Check every 20s for due reminders
@@ -1196,9 +1224,8 @@ function fireHabitReminder(h) {
       n.onclick = () => { window.focus(); n.close(); };
     } catch (e) { /* ignore */ }
   }
-  playAlarm();
-  toast(title);
-  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  startRing();
+  showAlarmOverlay(title, body);
 }
 
 /* ============================================================
@@ -1923,6 +1950,7 @@ function openUserModal(user) {
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchView(t.dataset.view));
 document.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => switchView(b.dataset.goto));
 document.getElementById('avatar-btn').onclick = () => switchView('profile');
+document.getElementById('alarm-stop').onclick = dismissAlarm;
 
 // Quick add task (Today → today's date, Tasks → selected date)
 function wireQuickAdd(inputId, btnId, getDate) {

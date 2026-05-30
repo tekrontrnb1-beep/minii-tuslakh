@@ -513,6 +513,31 @@ body {
 .perm-item.on .pi-check { background: var(--primary); border-color: var(--primary); color: #fff; }
 .perm-item.locked { opacity: 0.55; cursor: not-allowed; }
 
+/* Ringing alarm overlay */
+.alarm-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: linear-gradient(160deg, var(--primary) 0%, var(--primary-dark) 100%);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; animation: fade .2s ease;
+}
+.alarm-card { text-align: center; color: #fff; max-width: 360px; width: 100%; }
+.alarm-bell { font-size: 84px; animation: ring 1s ease-in-out infinite; }
+@keyframes ring {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(18deg); }
+  40% { transform: rotate(-16deg); }
+  60% { transform: rotate(12deg); }
+  80% { transform: rotate(-8deg); }
+}
+.alarm-title { font-size: 26px; font-weight: 800; margin-top: 16px; }
+.alarm-sub { font-size: 15px; color: rgba(255,255,255,0.85); margin-top: 8px; }
+.alarm-stop {
+  margin-top: 36px; width: 100%; background: #fff; color: var(--primary);
+  border: none; border-radius: 16px; padding: 18px; font-size: 18px; font-weight: 800; cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+.alarm-stop:active { transform: scale(0.97); }
+
 /* Toast */
 .toast {
   position: fixed; bottom: calc(var(--safe-bottom) + 150px); left: 50%; transform: translateX(-50%);

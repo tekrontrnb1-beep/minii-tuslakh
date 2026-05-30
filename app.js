@@ -634,7 +634,7 @@ const modalBody = document.getElementById('modal-body');
 const modalTitle = document.getElementById('modal-title');
 
 function openModal() { overlay.hidden = false; }
-function closeModal() { overlay.hidden = true; modalBody.innerHTML = ''; }
+function closeModal() { if (typeof stopAlarm === 'function') stopAlarm(); overlay.hidden = true; modalBody.innerHTML = ''; }
 document.getElementById('modal-close').onclick = closeModal;
 overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
 
@@ -822,7 +822,15 @@ function openReminderModal(rem) {
     const rb = document.getElementById('rm-snd-reset'); if (rb) rb.hidden = !hasCustomAlarm();
   };
   document.getElementById('rm-snd-pick').onclick = () => pickAlarmSound(refreshSnd);
-  document.getElementById('rm-snd-play').onclick = playAlarm;
+  const playBtn = document.getElementById('rm-snd-play');
+  playBtn.onclick = () => {
+    if (alarmSource) { stopAlarm(); playBtn.textContent = '▶'; return; }
+    playAlarm();
+    if (alarmSource) {
+      playBtn.textContent = '■';
+      alarmSource.addEventListener('ended', () => { playBtn.textContent = '▶'; });
+    }
+  };
   document.getElementById('rm-snd-reset').onclick = () => resetAlarmSound(refreshSnd);
   document.getElementById('f-save').onclick = () => {
     const title = val('f-title').trim();
@@ -1077,6 +1085,7 @@ function playAlarm() {
       const src = ctx.createBufferSource();
       src.buffer = alarmBuffer;
       src.connect(ctx.destination);
+      src.onended = () => { if (alarmSource === src) alarmSource = null; };
       src.start();
       src.stop(ctx.currentTime + Math.min(alarmBuffer.duration, ALARM_MAX_SEC));
       alarmSource = src;
@@ -1084,6 +1093,10 @@ function playAlarm() {
     } catch (e) { /* fall through to beep */ }
   }
   beep();
+}
+
+function stopAlarm() {
+  if (alarmSource) { try { alarmSource.stop(); } catch (e) { /* ignore */ } alarmSource = null; }
 }
 
 function pickAlarmSound(onDone) {

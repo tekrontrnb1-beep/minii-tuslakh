@@ -41,6 +41,16 @@ const TASK_CATS = [
 ];
 const taskCat = (k) => TASK_CATS.find(c => c.key === k) || TASK_CATS.find(c => c.key === 'other');
 
+/* ---------- Theme (light / dark) ---------- */
+const THEME_KEY = 'tuslakh-theme';
+function getTheme() { return localStorage.getItem(THEME_KEY) || 'dark'; }
+function applyTheme(t) {
+  document.body.classList.toggle('light', t === 'light');
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', t === 'light' ? '#2563eb' : '#6c5ce7');
+}
+function setTheme(t) { localStorage.setItem(THEME_KEY, t); applyTheme(t); }
+
 /* ---------- Money formatting (Tugrik) ---------- */
 function money(n) {
   const neg = n < 0;
@@ -1411,6 +1421,15 @@ function renderProfile() {
       <div class="settings-row" id="pf-import">
         <span class="sr-ico">📥</span><div class="sr-main"><div class="sr-label">Сэргээх</div><div class="sr-sub">Нөөц файлаас өгөгдлөө буцааж ачаалах</div></div><span class="sr-arrow">›</span>
       </div>
+    </div>
+    <div class="settings-group">
+      <div class="sg-title">Харагдац</div>
+      <div style="padding:14px 16px">
+        <div class="seg" id="pf-theme">
+          <button data-v="dark" class="${getTheme() === 'dark' ? 'active' : ''}">🌙 Харанхуй</button>
+          <button data-v="light" class="${getTheme() === 'light' ? 'active' : ''}">☀️ Цайвар</button>
+        </div>
+      </div>
     </div>`;
   if (isAdmin) {
     html += `<div class="section-head"><h2>Хэрэглэгчид (${auth.users.length})</h2>
@@ -1422,6 +1441,7 @@ function renderProfile() {
   document.getElementById('pf-logout').onclick = () => { if (confirm('Системээс гарах уу?')) logout(); };
   document.getElementById('pf-export').onclick = exportData;
   document.getElementById('pf-import').onclick = importData;
+  segHandler('pf-theme', v => setTheme(v));
   if (isAdmin) {
     document.getElementById('pf-adduser').onclick = () => openUserModal(null);
     auth.users.forEach(x => {
@@ -1741,6 +1761,7 @@ function migrateAuth() {
 }
 
 function boot() {
+  applyTheme(getTheme());
   initEmail();
   migrateAuth();
   if (auth.currentUserId) {

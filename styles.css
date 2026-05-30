@@ -8,14 +8,46 @@
   --muted: #9aa0c5;
   --primary: #6c5ce7;
   --primary-2: #8b7bff;
+  --primary-dark: #4834b5;
+  --glow: rgba(108,92,231,0.4);
+  --primary-tint: rgba(108,92,231,0.15);
   --green: #00d68f;
   --red: #ff5e7e;
   --amber: #ffb648;
   --blue: #4dabff;
+  --bar-bg: rgba(26,27,46,0.92);
+  --auth-accent: #2a2566;
   --radius: 18px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+/* Light theme (GS25-style blue) */
+body.light {
+  --bg: #eef1f6;
+  --bg-soft: #ffffff;
+  --card: #ffffff;
+  --card-2: #eef2f8;
+  --line: #e2e8f1;
+  --text: #16202e;
+  --muted: #6a7686;
+  --primary: #2563eb;
+  --primary-2: #3b82f6;
+  --primary-dark: #1d4ed8;
+  --glow: rgba(37,99,235,0.26);
+  --primary-tint: rgba(37,99,235,0.10);
+  --green: #15a34a;
+  --red: #e11d48;
+  --amber: #d97706;
+  --blue: #2563eb;
+  --bar-bg: rgba(255,255,255,0.94);
+  --auth-accent: #d7e5fb;
+}
+body.light .app-header { background: var(--bg); }
+body.light .weather-card:not(.empty-state) { background: linear-gradient(135deg, #2f80ed 0%, #1f5fd0 100%); }
+body.light .card, body.light .task-item, body.light .reminder-item, body.light .fin-item,
+body.light .habit-card, body.light .user-row, body.light .settings-group, body.light .profile-card,
+body.light .stat-tile, body.light .hs-tile { box-shadow: 0 2px 8px rgba(20,40,80,0.06); }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
@@ -44,7 +76,7 @@ body {
   background: linear-gradient(135deg, var(--primary-2), var(--primary)); color: #fff;
   font-size: 15px; font-weight: 800; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 12px rgba(108,92,231,0.4);
+  box-shadow: 0 4px 12px var(--glow);
 }
 .avatar-btn:active { transform: scale(0.92); }
 .app-header h1 { font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px; }
@@ -58,11 +90,11 @@ body {
 
 /* Hero */
 .hero-card {
-  background: linear-gradient(135deg, var(--primary) 0%, #4834b5 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   border-radius: var(--radius);
   padding: 20px;
   margin: 6px 0 22px;
-  box-shadow: 0 10px 30px rgba(108,92,231,0.35);
+  box-shadow: 0 10px 30px var(--glow);
 }
 .hero-greeting { font-size: 20px; font-weight: 800; }
 .hero-sub { color: rgba(255,255,255,0.85); font-size: 13px; margin-top: 4px; }
@@ -77,9 +109,9 @@ body {
 /* Install banner */
 .install-banner {
   display: flex; align-items: center; gap: 12px;
-  background: linear-gradient(135deg, var(--primary) 0%, #4834b5 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   border-radius: var(--radius); padding: 14px 16px; margin: 6px 0 16px;
-  box-shadow: 0 8px 22px rgba(108,92,231,0.35);
+  box-shadow: 0 8px 22px var(--glow);
 }
 .install-banner .ib-ico { font-size: 28px; }
 .install-banner .ib-main { flex: 1; min-width: 0; }
@@ -343,7 +375,7 @@ body {
   width: 58px; height: 58px; border-radius: 50%; border: none;
   background: linear-gradient(135deg, var(--primary-2), var(--primary));
   color: #fff; font-size: 30px; font-weight: 300; cursor: pointer; z-index: 30;
-  box-shadow: 0 8px 24px rgba(108,92,231,0.5);
+  box-shadow: 0 8px 24px var(--glow);
   display: flex; align-items: center; justify-content: center; line-height: 1;
 }
 .fab:active { transform: scale(0.92); }
@@ -352,7 +384,7 @@ body {
 .tabbar {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 25;
   display: flex; justify-content: space-around;
-  background: rgba(26,27,46,0.92); backdrop-filter: blur(16px);
+  background: var(--bar-bg); backdrop-filter: blur(16px);
   border-top: 1px solid var(--line);
   padding: 8px 4px calc(var(--safe-bottom) + 8px);
 }
@@ -402,7 +434,7 @@ body {
 .cat-pick button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .emoji-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .emoji-row button { width: 44px; height: 44px; font-size: 22px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
-.emoji-row button.active { border-color: var(--primary); background: rgba(108,92,231,0.18); }
+.emoji-row button.active { border-color: var(--primary); background: var(--primary-tint); }
 .btn-primary {
   width: 100%; background: linear-gradient(135deg, var(--primary-2), var(--primary)); color: #fff;
   border: none; border-radius: 14px; padding: 16px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 6px;
@@ -412,7 +444,7 @@ body {
 /* Auth screen */
 .auth-screen {
   position: fixed; inset: 0; z-index: 100; overflow-y: auto;
-  background: radial-gradient(circle at 30% 0%, #2a2566 0%, var(--bg) 55%);
+  background: radial-gradient(circle at 30% 0%, var(--auth-accent) 0%, var(--bg) 55%);
   display: flex; align-items: center; justify-content: center;
   padding: calc(var(--safe-top) + 30px) 22px calc(var(--safe-bottom) + 30px);
 }
@@ -420,9 +452,9 @@ body {
 .auth-logo { text-align: center; margin-bottom: 26px; }
 .auth-logo .al-ico {
   width: 76px; height: 76px; border-radius: 22px; margin: 0 auto 14px;
-  background: linear-gradient(135deg, var(--primary-2), #4834b5);
+  background: linear-gradient(135deg, var(--primary-2), var(--primary-dark));
   display: flex; align-items: center; justify-content: center; font-size: 38px;
-  box-shadow: 0 10px 30px rgba(108,92,231,0.45);
+  box-shadow: 0 10px 30px var(--glow);
 }
 .auth-logo h2 { margin: 0; font-size: 24px; font-weight: 800; }
 .auth-logo p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
@@ -463,7 +495,7 @@ body {
 /* Permission checkboxes */
 .perm-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
 .perm-item { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; cursor: pointer; }
-.perm-item.on { border-color: var(--primary); background: rgba(108,92,231,0.12); }
+.perm-item.on { border-color: var(--primary); background: var(--primary-tint); }
 .perm-item .pi-ico { font-size: 18px; }
 .perm-item .pi-label { flex: 1; font-size: 15px; font-weight: 600; }
 .perm-item .pi-check { width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--muted); display: flex; align-items: center; justify-content: center; color: transparent; font-size: 13px; }

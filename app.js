@@ -1632,6 +1632,9 @@ function renderProfile() {
       <div class="settings-row danger" id="pf-logout">
         <span class="sr-ico">🚪</span><div class="sr-main"><div class="sr-label">Гарах</div><div class="sr-sub">@${esc(u.username)}</div></div>
       </div>
+      <div class="settings-row danger" id="pf-delete-acc">
+        <span class="sr-ico">🗑️</span><div class="sr-main"><div class="sr-label">Бүртгэл устгах</div><div class="sr-sub">Бүх өгөгдөл бүрмөсөн устана</div></div>
+      </div>
     </div>
     ${isAdmin ? `<div class="settings-group">
       <div class="sg-title">Өгөгдөл</div>
@@ -1660,6 +1663,7 @@ function renderProfile() {
   document.getElementById('pf-edit').onclick = openProfileEdit;
   document.getElementById('pf-pass').onclick = openChangePw;
   document.getElementById('pf-logout').onclick = () => { if (confirm('Системээс гарах уу?')) logout(); };
+  document.getElementById('pf-delete-acc').onclick = openDeleteAccount;
   const onIf = (id, h) => { const el = document.getElementById(id); if (el) el.onclick = h; };
   onIf('pf-export', exportData);
   onIf('pf-import', importData);
@@ -1747,6 +1751,42 @@ function fmtBirthday(s) {
   if (!s) return '';
   const d = parseYmd(s);
   return `${d.getFullYear()} оны ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+}
+
+function openDeleteAccount() {
+  const u = currentUser;
+  const admins = auth.users.filter(x => x.role === 'admin');
+  const others = auth.users.filter(x => x.id !== u.id);
+  modalTitle.textContent = 'Бүртгэл устгах';
+  // Block deleting the last admin while other users still exist (they'd be orphaned)
+  if (u.role === 'admin' && admins.length <= 1 && others.length > 0) {
+    modalBody.innerHTML = `<div class="auth-error" style="margin-bottom:0">⚠️ Та цорын ганц админ байна. Эхлээд өөр хэрэглэгчийг админ болгож томилсны дараа бүртгэлээ устгана уу.</div>
+      <button class="btn-primary" id="da-cancel" style="margin-top:16px">Болих</button>`;
+    document.getElementById('da-cancel').onclick = closeModal;
+    openModal();
+    return;
+  }
+  modalBody.innerHTML = `
+    <div class="auth-error">⚠️ Энэ үйлдлийг буцаах боломжгүй! Таны бүх даалгавар, зуршил, сэрүүлэг, санхүүгийн мэдээлэл бүрмөсөн устана.</div>
+    <div class="field"><label>Баталгаажуулахын тулд нууц үгээ оруулна уу</label>
+      <input id="da-pass" type="password" placeholder="••••••"/></div>
+    <button class="btn-primary" id="da-del" style="background:var(--red)">Бүртгэлээ бүрмөсөн устгах</button>
+    <button class="btn-primary" id="da-cancel" style="background:var(--card-2);margin-top:10px">Болих</button>`;
+  document.getElementById('da-cancel').onclick = closeModal;
+  document.getElementById('da-del').onclick = async () => {
+    const h = await hashPw(val('da-pass'), u.salt);
+    if (h !== u.passHash) { toast('Нууц үг буруу байна'); return; }
+    localStorage.removeItem(dataKey(u.id));
+    auth.users = auth.users.filter(x => x.id !== u.id);
+    auth.currentUserId = null;
+    saveAuth();
+    currentUser = null; state = defaultState();
+    document.getElementById('fab').hidden = true;
+    closeModal();
+    showAuth('welcome');
+    toast('Бүртгэл устгагдлаа');
+  };
+  openModal();
 }
 
 function openProfileEdit() {

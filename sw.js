@@ -1,7 +1,7 @@
 /* Service worker — Миний Туслах
    Network-first for same-origin assets so updates appear immediately when
    online; falls back to cache when offline. */
-const CACHE = 'minii-tuslakh-v20';
+const CACHE = 'minii-tuslakh-v21';
 const ASSETS = [
   './',
   './index.html',

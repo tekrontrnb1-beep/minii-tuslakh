@@ -24,10 +24,29 @@ function saveAuth() { localStorage.setItem(AUTH_KEY, JSON.stringify(auth)); }
 const dataKey = (id) => 'minii-tuslakh-data-' + id;
 
 const defaultState = () => ({
-  tasks: [],      // {id, title, date, time, priority, note, done}
+  tasks: [],      // {id, title, date, time, priority, category, note, done}
   habits: [],     // {id, name, icon, history:{'YYYY-MM-DD':true}}
   reminders: [],  // {id, title, time:'HH:MM', date:'YYYY-MM-DD'|null, repeat:'none'|'daily'|'weekly', enabled, lastFired}
+  finance: [],    // {id, kind, title, amount, category, date, note}
 });
+
+/* ---------- Task categories ---------- */
+const TASK_CATS = [
+  { key: 'work', label: 'Ажил', icon: '💼' },
+  { key: 'personal', label: 'Хувийн', icon: '🏠' },
+  { key: 'finance', label: 'Санхүү', icon: '💰' },
+  { key: 'health', label: 'Эрүүл мэнд', icon: '❤️' },
+  { key: 'study', label: 'Суралцах', icon: '📚' },
+  { key: 'other', label: 'Бусад', icon: '📌' },
+];
+const taskCat = (k) => TASK_CATS.find(c => c.key === k) || TASK_CATS.find(c => c.key === 'other');
+
+/* ---------- Money formatting (Tugrik) ---------- */
+function money(n) {
+  const neg = n < 0;
+  const s = Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "'");
+  return (neg ? '-' : '') + s + '₮';
+}
 
 let state = defaultState();
 
@@ -61,6 +80,7 @@ const ALL_PERMS = [
   { key: 'calendar', label: 'Календар', icon: '📅' },
   { key: 'habits', label: 'Зуршил', icon: '🔥' },
   { key: 'reminders', label: 'Сэрүүлэг', icon: '🔔' },
+  { key: 'finance', label: 'Санхүү', icon: '💰' },
 ];
 const PERM_KEYS = ALL_PERMS.map(p => p.key);
 
@@ -103,11 +123,14 @@ let selectedDate = todayYmd();      // for tasks view
 let calMonth = new Date();          // calendar displayed month
 let calSelected = todayYmd();       // calendar selected day
 let taskFilter = 'all';
+let taskMode = 'day';        // 'day' | 'list'
+let listFilter = 'active';   // 'active' | 'done' | 'all'
+let catFilter = 'all';       // 'all' | category key
 
 /* ---------- Navigation ---------- */
 const HEADER_TITLES = {
   today: 'Өнөөдөр', tasks: 'Даалгавар', calendar: 'Календар',
-  habits: 'Зуршил', reminders: 'Сэрүүлэг', profile: 'Профайл'
+  habits: 'Зуршил', reminders: 'Сэрүүлэг', finance: 'Санхүү', profile: 'Профайл'
 };
 
 function switchView(view) {
@@ -118,7 +141,7 @@ function switchView(view) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
   document.getElementById('header-title').textContent = HEADER_TITLES[view];
   // FAB shows on data-entry views, gated by the matching permission
-  const fabPerm = { today: 'tasks', tasks: 'tasks', calendar: 'tasks', habits: 'habits', reminders: 'reminders' }[view];
+  const fabPerm = { today: 'tasks', tasks: 'tasks', calendar: 'tasks', habits: 'habits', reminders: 'reminders', finance: 'finance' }[view];
   document.getElementById('fab').hidden = !fabPerm || !can(fabPerm);
   window.scrollTo(0, 0);
   render();
@@ -133,6 +156,7 @@ function render() {
     case 'calendar': renderCalendar(); break;
     case 'habits': renderHabits(); break;
     case 'reminders': renderReminders(); break;
+    case 'finance': renderFinance(); break;
     case 'profile': renderProfile(); break;
   }
 }
@@ -199,12 +223,19 @@ function renderToday() {
   } else {
     active.slice(0, 4).forEach(r => rl.appendChild(reminderNode(r, true)));
   }
+
+  renderTodayFinance();
 }
 
 /* ============================================================
    TASKS
    ============================================================ */
 function renderTasks() {
+  document.querySelectorAll('#view-tasks .ms-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === taskMode));
+  document.getElementById('tasks-by-day').hidden = taskMode !== 'day';
+  document.getElementById('tasks-all').hidden = taskMode !== 'list';
+  if (taskMode === 'list') { renderTaskList(); return; }
+
   // Date strip: 7 days from -1 .. +5 around today, keep selected in view
   const strip = document.getElementById('date-strip');
   strip.innerHTML = '';
@@ -220,7 +251,7 @@ function renderTasks() {
     strip.appendChild(pill);
   }
 
-  document.querySelectorAll('#view-tasks .chip').forEach(c =>
+  document.querySelectorAll('#tasks-by-day .chip').forEach(c =>
     c.classList.toggle('active', c.dataset.filter === taskFilter));
 
   let list = state.tasks.filter(x => x.date === selectedDate);
@@ -234,26 +265,131 @@ function renderTasks() {
   document.getElementById('task-empty').hidden = list.length > 0;
 }
 
-function taskNode(task) {
+// Days until deadline (negative = overdue). null if no date.
+function daysToDeadline(dateStr) {
+  if (!dateStr) return null;
+  return Math.round((parseYmd(dateStr) - parseYmd(todayYmd())) / 86400000);
+}
+function deadlineChip(task) {
+  if (!task.date) return '';
+  const d = daysToDeadline(task.date);
+  let cls = '', txt;
+  if (task.done) txt = `📅 ${fmtHuman(task.date)}`;
+  else if (d < 0) { cls = 'over'; txt = `⚠️ ${-d} хоног хэтэрсэн`; }
+  else if (d === 0) { cls = 'soon'; txt = '⏰ Өнөөдөр дуусна'; }
+  else if (d === 1) { cls = 'soon'; txt = '⏰ Маргааш'; }
+  else if (d <= 3) { cls = 'soon'; txt = `⏰ ${d} хоногийн дараа`; }
+  else txt = `📅 ${fmtHuman(task.date)}`;
+  return `<span class="deadline-chip ${cls}">${txt}</span>`;
+}
+
+function taskNode(task, opts = {}) {
   const li = document.createElement('li');
   li.className = 'task-item' + (task.done ? ' is-done' : '');
   const prio = { high: 'Чухал', med: 'Дунд', low: 'Бага' }[task.priority] || '';
   const prioCls = { high: 'prio-high', med: 'prio-med', low: 'prio-low' }[task.priority] || '';
+  const cat = taskCat(task.category);
   li.innerHTML = `
     <div class="task-check ${task.done ? 'done' : ''}">✓</div>
     <div class="task-main">
       <div class="task-title">${esc(task.title)}</div>
       <div class="task-meta">
-        ${task.time ? `<span>🕐 ${task.time}</span>` : ''}
+        <span class="cat-chip">${cat.icon} ${cat.label}</span>
+        ${opts.showDeadline ? deadlineChip(task) : (task.time ? `<span>🕐 ${task.time}</span>` : '')}
         ${prio ? `<span class="prio-dot ${prioCls}"></span><span>${prio}</span>` : ''}
         ${task.note ? `<span>📝</span>` : ''}
       </div>
     </div>
-    <button class="task-del">🗑</button>`;
+    ${opts.postpone && !task.done ? `<button class="task-postpone">⏰ Сунгах</button>` : `<button class="task-del">🗑</button>`}`;
   li.querySelector('.task-check').onclick = () => { task.done = !task.done; save(); render(); };
-  li.querySelector('.task-del').onclick = () => { removeTask(task.id); };
+  const del = li.querySelector('.task-del');
+  if (del) del.onclick = () => { removeTask(task.id); };
+  const pp = li.querySelector('.task-postpone');
+  if (pp) pp.onclick = (e) => { e.stopPropagation(); openPostpone(task); };
   li.querySelector('.task-main').onclick = () => openTaskModal(task);
   return li;
+}
+
+/* ---- List mode: all tasks grouped by deadline ---- */
+function renderTaskList() {
+  document.querySelectorAll('#tasks-all .chip').forEach(c =>
+    c.classList.toggle('active', c.dataset.lfilter === listFilter));
+
+  // category filter chips
+  const cf = document.getElementById('cat-filter');
+  cf.innerHTML = `<button class="chip ${catFilter === 'all' ? 'active' : ''}" data-cat="all">Бүгд</button>` +
+    TASK_CATS.map(c => `<button class="chip ${catFilter === c.key ? 'active' : ''}" data-cat="${c.key}">${c.icon} ${c.label}</button>`).join('');
+  cf.querySelectorAll('.chip').forEach(b => b.onclick = () => { catFilter = b.dataset.cat; renderTaskList(); });
+
+  let list = state.tasks.slice();
+  if (listFilter === 'active') list = list.filter(t => !t.done);
+  if (listFilter === 'done') list = list.filter(t => t.done);
+  if (catFilter !== 'all') list = list.filter(t => (t.category || 'other') === catFilter);
+
+  const groups = document.getElementById('task-groups');
+  groups.innerHTML = '';
+  document.getElementById('list-empty').hidden = list.length > 0;
+
+  // buckets
+  const buckets = [
+    { key: 'over', title: '⚠️ Хугацаа хэтэрсэн', cls: 'overdue', items: [] },
+    { key: 'today', title: '⏰ Өнөөдөр', cls: '', items: [] },
+    { key: 'soon', title: '📅 Удахгүй', cls: '', items: [] },
+    { key: 'later', title: '🗓️ Дараа', cls: '', items: [] },
+    { key: 'none', title: '📋 Хугацаагүй', cls: '', items: [] },
+    { key: 'done', title: '✅ Дууссан', cls: '', items: [] },
+  ];
+  const map = {};
+  buckets.forEach(b => map[b.key] = b);
+  list.forEach(t => {
+    if (t.done) { map.done.items.push(t); return; }
+    const d = daysToDeadline(t.date);
+    if (d === null) map.none.items.push(t);
+    else if (d < 0) map.over.items.push(t);
+    else if (d === 0) map.today.items.push(t);
+    else if (d <= 7) map.soon.items.push(t);
+    else map.later.items.push(t);
+  });
+  // sort dated buckets by date asc
+  ['over', 'today', 'soon', 'later'].forEach(k => map[k].items.sort((a, b) => (a.date || '') > (b.date || '') ? 1 : -1));
+
+  buckets.forEach(b => {
+    if (!b.items.length) return;
+    const g = document.createElement('div');
+    g.className = 'task-group ' + b.cls;
+    g.innerHTML = `<div class="tg-head">${b.title}<span class="tg-count">${b.items.length}</span></div>`;
+    const ul = document.createElement('ul');
+    ul.className = 'task-list';
+    b.items.forEach(t => ul.appendChild(taskNode(t, { showDeadline: true, postpone: b.key !== 'done' })));
+    g.appendChild(ul);
+    groups.appendChild(g);
+  });
+}
+
+/* ---- Postpone (extend deadline) ---- */
+function openPostpone(task) {
+  modalTitle.textContent = 'Хугацаа сунгах';
+  const base = task.date ? task.date : todayYmd();
+  const plus = (n) => { const d = parseYmd(base); d.setDate(d.getDate() + n); return ymd(d); };
+  modalBody.innerHTML = `
+    <div class="field"><label>"${esc(task.title)}"</label>
+      <div style="color:var(--muted);font-size:13px;margin-bottom:6px">${task.date ? 'Одоогийн хугацаа: ' + fmtHuman(task.date) : 'Хугацаа тогтоогоогүй'}</div>
+    </div>
+    <div class="seg" style="margin-bottom:10px">
+      <button data-add="1">+1 өдөр</button>
+      <button data-add="3">+3 өдөр</button>
+      <button data-add="7">+1 долоо хоног</button>
+    </div>
+    <div class="field"><label>Эсвэл огноо сонгох</label>
+      <input id="pp-date" type="date" value="${base}"/></div>
+    <button class="btn-primary" id="pp-save">Хадгалах</button>`;
+  modalBody.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
+    task.date = plus(parseInt(b.dataset.add, 10)); save(); closeModal(); render(); toast('Хугацаа сунгалаа');
+  });
+  document.getElementById('pp-save').onclick = () => {
+    task.date = val('pp-date'); save(); closeModal(); render(); toast('Хугацаа шинэчлэгдлээ');
+  };
+  openModal();
 }
 
 function removeTask(id) {
@@ -479,11 +615,16 @@ function openTaskModal(task) {
   const editing = !!task;
   modalTitle.textContent = editing ? 'Даалгавар засах' : 'Шинэ даалгавар';
   const prio = task ? task.priority : 'med';
+  const curCat = task ? (task.category || 'other') : 'personal';
   modalBody.innerHTML = `
     <div class="field"><label>Гарчиг</label>
       <input id="f-title" placeholder="Жишээ: Англи хэл сурах" value="${task ? esc(task.title) : ''}"/></div>
-    <div class="field"><label>Огноо</label>
-      <input id="f-date" type="date" value="${task ? task.date : selectedDate}"/></div>
+    <div class="field"><label>Ангилал</label>
+      <div class="cat-pick" id="f-cat">
+        ${TASK_CATS.map(c => `<button data-v="${c.key}" class="${curCat === c.key ? 'active' : ''}">${c.icon} ${c.label}</button>`).join('')}
+      </div></div>
+    <div class="field"><label>Эцсийн хугацаа / deadline (заавал биш)</label>
+      <input id="f-date" type="date" value="${task ? (task.date || '') : selectedDate}"/></div>
     <div class="field"><label>Цаг (заавал биш)</label>
       <input id="f-time" type="time" value="${task ? (task.time || '') : ''}"/></div>
     <div class="field"><label>Чухал байдал</label>
@@ -496,12 +637,13 @@ function openTaskModal(task) {
       <textarea id="f-note" placeholder="Нэмэлт мэдээлэл...">${task ? esc(task.note || '') : ''}</textarea></div>
     <button class="btn-primary" id="f-save">${editing ? 'Хадгалах' : 'Нэмэх'}</button>`;
   segHandler('f-prio');
+  segHandler('f-cat');
   document.getElementById('f-save').onclick = () => {
     const title = val('f-title').trim();
     if (!title) { toast('Гарчиг оруулна уу'); return; }
     const data = {
-      title, date: val('f-date') || todayYmd(), time: val('f-time'),
-      priority: segVal('f-prio'), note: val('f-note').trim()
+      title, date: val('f-date'), time: val('f-time'),
+      priority: segVal('f-prio'), category: segVal('f-cat'), note: val('f-note').trim()
     };
     if (editing) Object.assign(task, data);
     else state.tasks.push(Object.assign({ id: uid(), done: false }, data));
@@ -614,6 +756,7 @@ function openReminderModal(rem) {
 document.getElementById('fab').onclick = () => {
   if (currentView === 'habits') openHabitModal();
   else if (currentView === 'reminders') openReminderModal(null);
+  else if (currentView === 'finance') openFinanceModal(null);
   else if (currentView === 'calendar') { selectedDate = calSelected; openTaskModal(null); }
   else openTaskModal(null);
 };
@@ -830,6 +973,128 @@ function checkReminders() {
       if (currentView === 'reminders' || currentView === 'today') render();
     }
   });
+}
+
+/* ============================================================
+   FINANCE  (cash, loans, receivables, payables, future income)
+   ============================================================ */
+const FIN_KINDS = [
+  { key: 'cash', label: 'Бэлэн мөнгө / Хадгаламж', short: 'Мөнгө', icon: '💵', sign: +1, group: 'asset' },
+  { key: 'receivable', label: 'Авлага (надад өгөх)', short: 'Авлага', icon: '📥', sign: +1, group: 'asset' },
+  { key: 'loan', label: 'Зээл', short: 'Зээл', icon: '🏦', sign: -1, group: 'liability' },
+  { key: 'payable', label: 'Өр төлбөр (би өгөх)', short: 'Өр', icon: '📤', sign: -1, group: 'liability' },
+  { key: 'income', label: 'Ирээдүйн орлого', short: 'Орлого', icon: '📈', sign: +1, group: 'future' },
+];
+const finKind = (k) => FIN_KINDS.find(x => x.key === k) || FIN_KINDS[0];
+let finFilter = 'all';
+
+function finTotals() {
+  const t = { cash: 0, receivable: 0, loan: 0, payable: 0, income: 0 };
+  state.finance.forEach(f => { t[f.kind] = (t[f.kind] || 0) + Number(f.amount || 0); });
+  const assets = t.cash + t.receivable;
+  const liab = t.loan + t.payable;
+  return Object.assign(t, { assets, liab, net: assets - liab });
+}
+
+function renderFinance() {
+  const tot = finTotals();
+  const sum = document.getElementById('fin-summary');
+  sum.className = 'fin-summary' + (tot.net < 0 ? ' neg' : '');
+  sum.innerHTML = `
+    <div class="fin-net-label">Цэвэр үлдэгдэл (хөрөнгө − өр)</div>
+    <div class="fin-net">${money(tot.net)}</div>
+    <div class="fin-ab">
+      <div class="fab-tile"><div class="fab-num">${money(tot.assets)}</div><div class="fab-lbl">Хөрөнгө</div></div>
+      <div class="fab-tile"><div class="fab-num">${money(tot.liab)}</div><div class="fab-lbl">Өр төлбөр</div></div>
+    </div>
+    ${tot.income ? `<div class="fin-future">📈 Ирээдүйд олох орлого: ${money(tot.income)}</div>` : ''}`;
+
+  const ff = document.getElementById('fin-filter');
+  ff.className = 'cat-filter';
+  ff.innerHTML = `<button class="chip ${finFilter === 'all' ? 'active' : ''}" data-k="all">Бүгд</button>` +
+    FIN_KINDS.map(k => `<button class="chip ${finFilter === k.key ? 'active' : ''}" data-k="${k.key}">${k.icon} ${k.short}</button>`).join('');
+  ff.querySelectorAll('.chip').forEach(b => b.onclick = () => { finFilter = b.dataset.k; renderFinance(); });
+
+  const groups = document.getElementById('fin-groups');
+  groups.innerHTML = '';
+  const kinds = finFilter === 'all' ? FIN_KINDS : FIN_KINDS.filter(k => k.key === finFilter);
+  kinds.forEach(k => {
+    const items = state.finance.filter(f => f.kind === k.key);
+    if (!items.length) return;
+    const total = items.reduce((s, f) => s + Number(f.amount || 0), 0);
+    const g = document.createElement('div');
+    g.className = 'fin-group';
+    g.innerHTML = `<div class="fg-head"><span class="fg-title">${k.icon} ${k.label}</span>
+      <span class="fg-total" style="color:${k.sign > 0 ? 'var(--green)' : 'var(--red)'}">${k.sign > 0 ? '+' : '−'}${money(total)}</span></div>`;
+    items.sort((a, b) => (a.date || '') > (b.date || '') ? 1 : -1);
+    items.forEach(f => g.appendChild(finNode(f, k)));
+    groups.appendChild(g);
+  });
+  document.getElementById('fin-empty').hidden = state.finance.length > 0;
+}
+
+function finNode(f, k) {
+  const div = document.createElement('div');
+  div.className = 'fin-item';
+  const dlabel = f.date ? (k.sign < 0 ? '🗓️ Төлөх: ' : '🗓️ ') + fmtHuman(f.date) : '';
+  const sub = [dlabel, f.note].filter(Boolean).join(' · ');
+  div.innerHTML = `
+    <span class="fi-ico">${k.icon}</span>
+    <div class="fi-main"><div class="fi-title">${esc(f.title)}</div>${sub ? `<div class="fi-sub">${esc(sub)}</div>` : ''}</div>
+    <div class="fi-amount ${k.sign > 0 ? 'pos' : 'neg'}">${k.sign > 0 ? '+' : '−'}${money(Number(f.amount || 0))}</div>`;
+  div.onclick = () => openFinanceModal(f);
+  return div;
+}
+
+function openFinanceModal(item) {
+  const editing = !!item;
+  modalTitle.textContent = editing ? 'Бичлэг засах' : 'Шинэ санхүүгийн бичлэг';
+  let kind = item ? item.kind : 'cash';
+  modalBody.innerHTML = `
+    <div class="field"><label>Төрөл</label>
+      <div class="cat-pick" id="fin-kind">
+        ${FIN_KINDS.map(k => `<button data-v="${k.key}" class="${kind === k.key ? 'active' : ''}">${k.icon} ${k.short}</button>`).join('')}
+      </div></div>
+    <div class="field"><label>Нэр</label><input id="fin-title" value="${editing ? esc(item.title) : ''}" placeholder="Жишээ: Хаан банкны зээл"/></div>
+    <div class="field"><label>Дүн (₮)</label><input id="fin-amount" type="number" inputmode="numeric" value="${editing ? item.amount : ''}" placeholder="0"/></div>
+    <div class="field"><label>Огноо / төлөх хугацаа (заавал биш)</label><input id="fin-date" type="date" value="${editing ? (item.date || '') : ''}"/></div>
+    <div class="field"><label>Тэмдэглэл (заавал биш)</label><textarea id="fin-note" placeholder="Жишээ: сарын хүү, хэнээс/хэнд гэх мэт...">${editing ? esc(item.note || '') : ''}</textarea></div>
+    <button class="btn-primary" id="fin-save">${editing ? 'Хадгалах' : 'Нэмэх'}</button>
+    ${editing ? `<button class="btn-primary" id="fin-del" style="background:rgba(255,94,126,0.15);color:var(--red);margin-top:10px">Устгах</button>` : ''}`;
+  segHandler('fin-kind', v => { kind = v; });
+  document.getElementById('fin-save').onclick = () => {
+    const title = val('fin-title').trim();
+    const amount = parseFloat(val('fin-amount'));
+    if (!title) { toast('Нэр оруулна уу'); return; }
+    if (isNaN(amount) || amount < 0) { toast('Зөв дүн оруулна уу'); return; }
+    const data = { kind, title, amount, date: val('fin-date'), note: val('fin-note').trim() };
+    if (editing) Object.assign(item, data);
+    else state.finance.push(Object.assign({ id: uid() }, data));
+    save(); closeModal(); render(); toast(editing ? 'Хадгаллаа' : 'Бичлэг нэмлээ');
+  };
+  const del = document.getElementById('fin-del');
+  if (del) del.onclick = () => {
+    if (!confirm('Энэ бичлэгийг устгах уу?')) return;
+    state.finance = state.finance.filter(x => x.id !== item.id);
+    save(); closeModal(); render(); toast('Устгалаа');
+  };
+  openModal();
+}
+
+function renderTodayFinance() {
+  const fin = document.getElementById('today-finance');
+  if (!fin) return;
+  if (!state.finance.length) {
+    fin.innerHTML = `<div class="fin-mini" id="fin-mini"><span class="fm-ico">💰</span>
+      <div class="fm-main"><div class="fm-label">Санхүүгийн бүртгэл хоосон</div><div class="fm-net">Нэмж эхлэх →</div></div></div>`;
+  } else {
+    const tot = finTotals();
+    fin.innerHTML = `<div class="fin-mini" id="fin-mini"><span class="fm-ico">💰</span>
+      <div class="fm-main"><div class="fm-label">Цэвэр үлдэгдэл</div>
+      <div class="fm-net ${tot.net < 0 ? 'neg' : 'pos'}">${money(tot.net)}</div></div>
+      <span style="color:var(--muted);font-size:18px">›</span></div>`;
+  }
+  document.getElementById('fin-mini').onclick = () => switchView('finance');
 }
 
 /* ============================================================
@@ -1181,7 +1446,7 @@ function wireQuickAdd(inputId, btnId, getDate) {
   const submit = () => {
     const title = inp.value.trim();
     if (!title) return;
-    state.tasks.push({ id: uid(), title, date: getDate(), time: '', priority: 'med', note: '', done: false });
+    state.tasks.push({ id: uid(), title, date: getDate(), time: '', priority: 'med', category: 'personal', note: '', done: false });
     save(); inp.value = ''; render(); toast('Даалгавар нэмлээ');
     inp.focus();
   };
@@ -1190,8 +1455,12 @@ function wireQuickAdd(inputId, btnId, getDate) {
 }
 wireQuickAdd('qa-today', 'qa-today-btn', () => todayYmd());
 wireQuickAdd('qa-tasks', 'qa-tasks-btn', () => selectedDate);
-document.querySelectorAll('#view-tasks .chip').forEach(c =>
+document.querySelectorAll('#tasks-by-day .chip').forEach(c =>
   c.onclick = () => { taskFilter = c.dataset.filter; renderTasks(); });
+document.querySelectorAll('#view-tasks .ms-btn').forEach(b =>
+  b.onclick = () => { taskMode = b.dataset.mode; renderTasks(); });
+document.querySelectorAll('#tasks-all .chip[data-lfilter]').forEach(c =>
+  c.onclick = () => { listFilter = c.dataset.lfilter; renderTaskList(); });
 document.getElementById('cal-prev').onclick = () => { calMonth.setMonth(calMonth.getMonth() - 1); renderCalendar(); };
 document.getElementById('cal-next').onclick = () => { calMonth.setMonth(calMonth.getMonth() + 1); renderCalendar(); };
 
@@ -1284,7 +1553,18 @@ document.addEventListener('visibilitychange', () => {
 });
 
 /* ---------- Boot ---------- */
+function migrateAuth() {
+  // grant newly-added modules to existing 'user' accounts so they aren't hidden
+  let changed = false;
+  auth.users.forEach(u => {
+    if (!Array.isArray(u.perms)) u.perms = [...PERM_KEYS];
+    if (u.role === 'user' && !u.perms.includes('finance')) { u.perms.push('finance'); changed = true; }
+  });
+  if (changed) saveAuth();
+}
+
 function boot() {
+  migrateAuth();
   if (auth.users.length === 0) { showAuth('setup'); return; }
   if (auth.currentUserId) {
     const u = auth.users.find(x => x.id === auth.currentUserId);

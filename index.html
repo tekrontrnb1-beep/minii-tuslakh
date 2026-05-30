@@ -78,22 +78,50 @@
         </div>
         <ul class="reminder-list" id="today-reminders"></ul>
       </div>
+
+      <div data-perm="finance">
+        <div class="section-head">
+          <h2>Санхүү</h2>
+          <button class="link-btn" data-goto="finance">Дэлгэрэнгүй →</button>
+        </div>
+        <div id="today-finance"></div>
+      </div>
     </section>
 
     <!-- TASKS -->
     <section class="view" id="view-tasks">
-      <div class="date-strip" id="date-strip"></div>
-      <div class="quick-add">
-        <input id="qa-tasks" placeholder="Энэ өдөрт даалгавар нэмэх..." maxlength="120"/>
-        <button id="qa-tasks-btn">+</button>
+      <div class="mode-switch">
+        <button class="ms-btn active" data-mode="day">📅 Өдрөөр</button>
+        <button class="ms-btn" data-mode="list">📋 Бүх жагсаалт</button>
       </div>
-      <div class="filter-row">
-        <button class="chip active" data-filter="all">Бүгд</button>
-        <button class="chip" data-filter="active">Хийгдээгүй</button>
-        <button class="chip" data-filter="done">Дууссан</button>
+
+      <!-- Mode: by day -->
+      <div id="tasks-by-day">
+        <div class="date-strip" id="date-strip"></div>
+        <div class="quick-add">
+          <input id="qa-tasks" placeholder="Энэ өдөрт даалгавар нэмэх..." maxlength="120"/>
+          <button id="qa-tasks-btn">+</button>
+        </div>
+        <div class="filter-row">
+          <button class="chip active" data-filter="all">Бүгд</button>
+          <button class="chip" data-filter="active">Хийгдээгүй</button>
+          <button class="chip" data-filter="done">Дууссан</button>
+        </div>
+        <ul class="task-list" id="task-list"></ul>
+        <div class="empty" id="task-empty" hidden>Энэ өдөр даалгавар алга. <br/>+ товчоор нэмээрэй.</div>
       </div>
-      <ul class="task-list" id="task-list"></ul>
-      <div class="empty" id="task-empty" hidden>Энэ өдөр даалгавар алга. <br/>+ товчоор нэмээрэй.</div>
+
+      <!-- Mode: full list -->
+      <div id="tasks-all" hidden>
+        <div class="filter-row">
+          <button class="chip active" data-lfilter="active">Хийгдээгүй</button>
+          <button class="chip" data-lfilter="done">Дууссан</button>
+          <button class="chip" data-lfilter="all">Бүгд</button>
+        </div>
+        <div class="cat-filter" id="cat-filter"></div>
+        <div id="task-groups"></div>
+        <div class="empty" id="list-empty" hidden>Даалгавар алга. <br/>+ товчоор нэмээрэй.</div>
+      </div>
     </section>
 
     <!-- CALENDAR -->
@@ -130,6 +158,14 @@
       <div class="empty" id="reminder-empty" hidden>Сэрүүлэг алга байна.<br/>+ товчоор нэмээрэй.</div>
     </section>
 
+    <!-- FINANCE -->
+    <section class="view" id="view-finance">
+      <div class="fin-summary" id="fin-summary"></div>
+      <div class="filter-row" id="fin-filter"></div>
+      <div id="fin-groups"></div>
+      <div class="empty" id="fin-empty" hidden>Санхүүгийн бичлэг алга байна.<br/>+ товчоор зээл, мөнгө, өр авлагаа нэмээрэй.</div>
+    </section>
+
     <!-- PROFILE / SETTINGS -->
     <section class="view" id="view-profile"></section>
   </main>
@@ -153,6 +189,9 @@
     </button>
     <button class="tab" data-view="reminders">
       <span class="tab-ico">🔔</span><span class="tab-lbl">Сэрүүлэг</span>
+    </button>
+    <button class="tab" data-view="finance">
+      <span class="tab-ico">💰</span><span class="tab-lbl">Санхүү</span>
     </button>
   </nav>
 

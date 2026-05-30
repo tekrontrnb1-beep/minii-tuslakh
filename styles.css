@@ -531,12 +531,11 @@ body {
 }
 .alarm-title { font-size: 26px; font-weight: 800; margin-top: 16px; }
 .alarm-sub { font-size: 15px; color: rgba(255,255,255,0.85); margin-top: 8px; }
-.alarm-stop {
-  margin-top: 36px; width: 100%; background: #fff; color: var(--primary);
-  border: none; border-radius: 16px; padding: 18px; font-size: 18px; font-weight: 800; cursor: pointer;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-}
-.alarm-stop:active { transform: scale(0.97); }
+.alarm-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 34px; }
+.alarm-btn { width: 100%; border: none; border-radius: 16px; padding: 17px; font-size: 17px; font-weight: 800; cursor: pointer; }
+.alarm-btn.primary { background: #fff; color: var(--primary); box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+.alarm-btn.secondary { background: rgba(255,255,255,0.18); color: #fff; }
+.alarm-btn:active { transform: scale(0.97); }
 
 /* Toast */
 .toast {

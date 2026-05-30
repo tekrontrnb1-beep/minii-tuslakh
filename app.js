@@ -1115,17 +1115,34 @@ function stopRing() {
   if (ringAutoStop) { clearTimeout(ringAutoStop); ringAutoStop = null; }
 }
 
-/* ---- Ringing alarm overlay (with Stop button) ---- */
-function showAlarmOverlay(title, sub) {
-  const o = document.getElementById('alarm-overlay');
+/* ---- Ringing alarm overlay (with action buttons) ---- */
+function showAlarmOverlay(title, sub, actions) {
   document.getElementById('alarm-title').textContent = title;
   document.getElementById('alarm-sub').textContent = sub || '';
-  o.hidden = false;
+  const ac = document.getElementById('alarm-actions');
+  ac.innerHTML = '';
+  (actions || [{ label: '⏹ Болих', primary: true, fn: dismissAlarm }]).forEach(a => {
+    const b = document.createElement('button');
+    b.className = 'alarm-btn ' + (a.primary ? 'primary' : 'secondary');
+    b.textContent = a.label;
+    b.onclick = a.fn;
+    ac.appendChild(b);
+  });
+  document.getElementById('alarm-overlay').hidden = false;
 }
 function dismissAlarm() {
   stopRing();
   const o = document.getElementById('alarm-overlay');
   if (o) o.hidden = true;
+}
+function markHabitDone(h) {
+  h.history[todayYmd()] = true; save();
+  if (currentView === 'habits' || currentView === 'today') render();
+}
+function snoozeFire(fn, mins) {
+  dismissAlarm();
+  toast(`⏰ ${mins} минутын дараа дахин сануулна`);
+  setTimeout(fn, mins * 60000);
 }
 
 function pickAlarmSound(onDone) {
@@ -1167,7 +1184,10 @@ function fireReminder(r) {
     } catch (e) { /* some browsers need SW notifications */ }
   }
   startRing();
-  showAlarmOverlay('🔔 ' + r.title, `Сэрүүлгийн цаг боллоо · ${r.time}`);
+  showAlarmOverlay('🔔 ' + r.title, `Сэрүүлгийн цаг боллоо · ${r.time}`, [
+    { label: '⏰ 10 мин хойшлуулах', fn: () => snoozeFire(() => fireReminder(r), 10) },
+    { label: '✅ Болих', primary: true, fn: dismissAlarm },
+  ]);
 }
 
 // Check every 20s for due reminders
@@ -1225,7 +1245,12 @@ function fireHabitReminder(h) {
     } catch (e) { /* ignore */ }
   }
   startRing();
-  showAlarmOverlay(title, body);
+  const doLabel = h.type === 'negative' ? '✅ Тэвчсэн' : '✅ Хийсэн';
+  showAlarmOverlay(title, body, [
+    { label: doLabel, primary: true, fn: () => { markHabitDone(h); dismissAlarm(); toast('Тэмдэглэлээ'); } },
+    { label: '⏰ 10 мин хойшлуулах', fn: () => snoozeFire(() => fireHabitReminder(h), 10) },
+    { label: '❌ Цуцлах', fn: dismissAlarm },
+  ]);
 }
 
 /* ============================================================
@@ -1950,7 +1975,6 @@ function openUserModal(user) {
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchView(t.dataset.view));
 document.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => switchView(b.dataset.goto));
 document.getElementById('avatar-btn').onclick = () => switchView('profile');
-document.getElementById('alarm-stop').onclick = dismissAlarm;
 
 // Quick add task (Today → today's date, Tasks → selected date)
 function wireQuickAdd(inputId, btnId, getDate) {

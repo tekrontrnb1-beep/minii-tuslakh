@@ -992,6 +992,87 @@ function beep() {
   } catch (e) { /* ignore */ }
 }
 
+/* ---- Custom alarm sound (MP3 from device, stored in IndexedDB) ---- */
+const ALARM_NAME_KEY = 'tuslakh-alarm-name';
+const alarmName = () => localStorage.getItem(ALARM_NAME_KEY) || 'Анхдагч дуу (beep)';
+const hasCustomAlarm = () => !!localStorage.getItem(ALARM_NAME_KEY);
+let alarmUrl = null;
+
+function idbOpen() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('tuslakh-media', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+function idbSet(key, val) {
+  return idbOpen().then(db => new Promise((res, rej) => {
+    const tx = db.transaction('kv', 'readwrite');
+    tx.objectStore('kv').put(val, key);
+    tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error);
+  }));
+}
+function idbGet(key) {
+  return idbOpen().then(db => new Promise((res, rej) => {
+    const tx = db.transaction('kv', 'readonly');
+    const rq = tx.objectStore('kv').get(key);
+    rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
+  }));
+}
+function idbDel(key) {
+  return idbOpen().then(db => new Promise((res) => {
+    const tx = db.transaction('kv', 'readwrite');
+    tx.objectStore('kv').delete(key);
+    tx.oncomplete = () => res();
+  }));
+}
+
+async function loadAlarmSound() {
+  try {
+    const blob = await idbGet('alarmSound');
+    if (blob) { if (alarmUrl) URL.revokeObjectURL(alarmUrl); alarmUrl = URL.createObjectURL(blob); }
+  } catch (e) { /* ignore */ }
+}
+
+function playAlarm() {
+  if (alarmUrl) {
+    try {
+      const a = new Audio(alarmUrl);
+      a.play().catch(() => beep());
+      return;
+    } catch (e) { /* fall through */ }
+  }
+  beep();
+}
+
+function pickAlarmSound() {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'audio/*';
+  inp.onchange = async () => {
+    const file = inp.files && inp.files[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { toast('Хэт том файл (8MB-аас бага байх ёстой)'); return; }
+    try {
+      await idbSet('alarmSound', file);
+      localStorage.setItem(ALARM_NAME_KEY, file.name);
+      await loadAlarmSound();
+      render();
+      toast('🎵 Дуу хадгаллаа');
+    } catch (e) { toast('Хадгалахад алдаа гарлаа'); }
+  };
+  inp.click();
+}
+
+async function resetAlarmSound() {
+  try { await idbDel('alarmSound'); } catch (e) { /* ignore */ }
+  localStorage.removeItem(ALARM_NAME_KEY);
+  if (alarmUrl) { URL.revokeObjectURL(alarmUrl); alarmUrl = null; }
+  render();
+  toast('Анхдагч дуу болголоо');
+}
+
 function fireReminder(r) {
   if ('Notification' in window && Notification.permission === 'granted') {
     try {
@@ -1002,7 +1083,7 @@ function fireReminder(r) {
       n.onclick = () => { window.focus(); n.close(); };
     } catch (e) { /* some browsers need SW notifications */ }
   }
-  beep();
+  playAlarm();
   toast('🔔 ' + r.title);
   if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
@@ -1061,7 +1142,7 @@ function fireHabitReminder(h) {
       n.onclick = () => { window.focus(); n.close(); };
     } catch (e) { /* ignore */ }
   }
-  beep();
+  playAlarm();
   toast(title);
   if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
@@ -1494,7 +1575,7 @@ function renderProfile() {
         <span class="sr-ico">🚪</span><div class="sr-main"><div class="sr-label">Гарах</div><div class="sr-sub">@${esc(u.username)}</div></div>
       </div>
     </div>
-    <div class="settings-group">
+    ${isAdmin ? `<div class="settings-group">
       <div class="sg-title">Өгөгдөл</div>
       <div class="settings-row" id="pf-export">
         <span class="sr-ico">📤</span><div class="sr-main"><div class="sr-label">Нөөцлөх</div><div class="sr-sub">Бүх өгөгдлөө JSON файл болгон татах</div></div><span class="sr-arrow">›</span>
@@ -1502,6 +1583,17 @@ function renderProfile() {
       <div class="settings-row" id="pf-import">
         <span class="sr-ico">📥</span><div class="sr-main"><div class="sr-label">Сэргээх</div><div class="sr-sub">Нөөц файлаас өгөгдлөө буцааж ачаалах</div></div><span class="sr-arrow">›</span>
       </div>
+    </div>` : ''}
+    <div class="settings-group">
+      <div class="sg-title">Сэрүүлгийн дуу</div>
+      <div class="settings-row" id="pf-sound-pick">
+        <span class="sr-ico">🎵</span><div class="sr-main"><div class="sr-label">Дуу сонгох</div><div class="sr-sub">${esc(alarmName())}</div></div><span class="sr-arrow">›</span>
+      </div>
+      <div class="settings-row" id="pf-sound-play">
+        <span class="sr-ico">▶️</span><div class="sr-main"><div class="sr-label">Сонсох</div></div>
+      </div>
+      ${hasCustomAlarm() ? `<div class="settings-row danger" id="pf-sound-reset">
+        <span class="sr-ico">↩️</span><div class="sr-main"><div class="sr-label">Анхдагч дуу руу буцаах</div></div></div>` : ''}
     </div>
     <div class="settings-group">
       <div class="sg-title">Харагдац</div>
@@ -1520,8 +1612,12 @@ function renderProfile() {
   v.innerHTML = html;
   document.getElementById('pf-pass').onclick = openChangePw;
   document.getElementById('pf-logout').onclick = () => { if (confirm('Системээс гарах уу?')) logout(); };
-  document.getElementById('pf-export').onclick = exportData;
-  document.getElementById('pf-import').onclick = importData;
+  const onIf = (id, h) => { const el = document.getElementById(id); if (el) el.onclick = h; };
+  onIf('pf-export', exportData);
+  onIf('pf-import', importData);
+  onIf('pf-sound-pick', pickAlarmSound);
+  onIf('pf-sound-play', playAlarm);
+  onIf('pf-sound-reset', resetAlarmSound);
   segHandler('pf-theme', v => setTheme(v));
   if (isAdmin) {
     document.getElementById('pf-adduser').onclick = () => openUserModal(null);
@@ -1844,6 +1940,7 @@ function migrateAuth() {
 function boot() {
   applyTheme(getTheme());
   initEmail();
+  loadAlarmSound();
   migrateAuth();
   if (auth.currentUserId) {
     const u = auth.users.find(x => x.id === auth.currentUserId);

@@ -811,14 +811,19 @@ function openReminderModal(rem) {
         <span class="sr-snd-name" id="rm-snd-name">🎵 ${esc(alarmName())}</span>
         <button type="button" class="time-add" id="rm-snd-pick">Сонгох</button>
         <button type="button" class="snd-play" id="rm-snd-play">▶</button>
+        <button type="button" class="snd-play" id="rm-snd-reset" title="Анхдагч дуу" ${hasCustomAlarm() ? '' : 'hidden'}>↺</button>
       </div></div>
     <button class="btn-primary" id="f-save">${editing ? 'Хадгалах' : 'Нэмэх'}</button>`;
   segHandler('f-rep', (v) => {
     document.getElementById('date-field').hidden = (v !== 'none');
   });
-  const refreshSnd = () => { const el = document.getElementById('rm-snd-name'); if (el) el.textContent = '🎵 ' + alarmName(); };
+  const refreshSnd = () => {
+    const el = document.getElementById('rm-snd-name'); if (el) el.textContent = '🎵 ' + alarmName();
+    const rb = document.getElementById('rm-snd-reset'); if (rb) rb.hidden = !hasCustomAlarm();
+  };
   document.getElementById('rm-snd-pick').onclick = () => pickAlarmSound(refreshSnd);
   document.getElementById('rm-snd-play').onclick = playAlarm;
+  document.getElementById('rm-snd-reset').onclick = () => resetAlarmSound(refreshSnd);
   document.getElementById('f-save').onclick = () => {
     const title = val('f-title').trim();
     if (!title) { toast('Нэр оруулна уу'); return; }
@@ -1083,11 +1088,11 @@ function pickAlarmSound(onDone) {
   inp.click();
 }
 
-async function resetAlarmSound() {
+async function resetAlarmSound(onDone) {
   try { await idbDel('alarmSound'); } catch (e) { /* ignore */ }
   localStorage.removeItem(ALARM_NAME_KEY);
   if (alarmUrl) { URL.revokeObjectURL(alarmUrl); alarmUrl = null; }
-  render();
+  if (typeof onDone === 'function') onDone();
   toast('Анхдагч дуу болголоо');
 }
 
@@ -1607,17 +1612,6 @@ function renderProfile() {
       </div>
     </div>` : ''}
     <div class="settings-group">
-      <div class="sg-title">Сэрүүлгийн дуу</div>
-      <div class="settings-row" id="pf-sound-pick">
-        <span class="sr-ico">🎵</span><div class="sr-main"><div class="sr-label">Дуу сонгох</div><div class="sr-sub">${esc(alarmName())}</div></div><span class="sr-arrow">›</span>
-      </div>
-      <div class="settings-row" id="pf-sound-play">
-        <span class="sr-ico">▶️</span><div class="sr-main"><div class="sr-label">Сонсох</div></div>
-      </div>
-      ${hasCustomAlarm() ? `<div class="settings-row danger" id="pf-sound-reset">
-        <span class="sr-ico">↩️</span><div class="sr-main"><div class="sr-label">Анхдагч дуу руу буцаах</div></div></div>` : ''}
-    </div>
-    <div class="settings-group">
       <div class="sg-title">Харагдац</div>
       <div style="padding:14px 16px">
         <div class="seg" id="pf-theme">
@@ -1638,9 +1632,6 @@ function renderProfile() {
   const onIf = (id, h) => { const el = document.getElementById(id); if (el) el.onclick = h; };
   onIf('pf-export', exportData);
   onIf('pf-import', importData);
-  onIf('pf-sound-pick', () => pickAlarmSound());
-  onIf('pf-sound-play', playAlarm);
-  onIf('pf-sound-reset', resetAlarmSound);
   segHandler('pf-theme', v => setTheme(v));
   if (isAdmin) {
     document.getElementById('pf-adduser').onclick = () => openUserModal(null);

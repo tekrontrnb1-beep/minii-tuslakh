@@ -1143,28 +1143,42 @@ function setBusy(on, label) {
 
 function renderAuth() {
   const forms = {
-    setup: authSetupForm, login: authLoginForm, forgotUser: authForgotUserForm,
-    forgotPass: authForgotPassForm, verify: authVerifyForm, resetPass: authResetPassForm,
+    welcome: authWelcomeForm, register: authRegisterForm, login: authLoginForm,
+    forgotUser: authForgotUserForm, forgotPass: authForgotPassForm,
+    verify: authVerifyForm, resetPass: authResetPassForm,
   };
-  authScreen.innerHTML = (forms[authMode] || authLoginForm)();
+  authScreen.innerHTML = (forms[authMode] || authWelcomeForm)();
   wireAuth();
 }
 
-function authSetupForm() {
-  return authShell('Бүртгэл үүсгэх', 'Эхний админ бүртгэлээ үүсгэнэ үү', `
+function authWelcomeForm() {
+  return `<div class="auth-box">
+    <div class="auth-logo"><div class="al-ico">🗂️</div><h2>Миний Туслах</h2>
+      <p>Өдөр тутмын хувийн туслах</p></div>
+    <div class="auth-card">
+      <button class="btn-primary" id="au-go-register">📝 Шинээр бүртгүүлэх</button>
+      <button class="btn-primary" id="au-go-login" style="background:var(--card-2);margin-top:12px">🔓 Нэвтрэх</button>
+    </div>
+  </div>`;
+}
+function authRegisterForm() {
+  const first = auth.users.length === 0;
+  return authShell('Шинээр бүртгүүлэх', first ? 'Эхний бүртгэл (админ) үүсгэнэ үү' : 'Шинэ бүртгэл үүсгэнэ үү', `
     <div class="field"><label>Нэр</label><input id="au-name" placeholder="Таны нэр"/></div>
     <div class="field"><label>Хэрэглэгчийн нэр</label><input id="au-user" placeholder="username" autocapitalize="off"/></div>
     <div class="field"><label>Gmail хаяг</label><input id="au-email" type="email" placeholder="name@gmail.com" autocapitalize="off"/></div>
     <div class="field"><label>Нууц үг</label><input id="au-pass" type="password" placeholder="••••••"/></div>
     <div class="field"><label>Нууц үг давтах</label><input id="au-pass2" type="password" placeholder="••••••"/></div>
-    <button class="btn-primary" id="au-submit">Үргэлжлүүлэх</button>`);
+    <button class="btn-primary" id="au-submit">Үргэлжлүүлэх</button>
+    <div class="auth-switch">Бүртгэлтэй юу? <button id="au-go-login">Нэвтрэх</button> · <button id="au-back-welcome">← Буцах</button></div>`);
 }
 function authLoginForm() {
   return authShell('Нэвтрэх', 'Тавтай морил!', `
     <div class="field"><label>Хэрэглэгчийн нэр</label><input id="au-user" placeholder="username" autocapitalize="off"/></div>
     <div class="field"><label>Нууц үг</label><input id="au-pass" type="password" placeholder="••••••"/></div>
     <button class="btn-primary" id="au-submit">Нэвтрэх</button>
-    <div class="auth-switch"><button id="au-forgot-user">Нэвтрэх нэр?</button> · <button id="au-forgot-pass">Нууц үг мартсан?</button></div>`);
+    <div class="auth-switch"><button id="au-forgot-user">Нэвтрэх нэр?</button> · <button id="au-forgot-pass">Нууц үг мартсан?</button></div>
+    <div class="auth-switch">Шинэ хэрэглэгч үү? <button id="au-go-register">Бүртгүүлэх</button></div>`);
 }
 function authForgotUserForm() {
   return authShell('Нэвтрэх нэр сэргээх', 'Бүртгэлтэй Gmail хаягаа оруулна уу', `
@@ -1194,17 +1208,20 @@ function authResetPassForm() {
 }
 
 function wireAuth() {
-  const actions = { setup: doSetup, login: doLogin, forgotUser: doForgotUser, forgotPass: doForgotPass, verify: doVerify, resetPass: doResetPass };
+  const actions = { register: doRegister, login: doLogin, forgotUser: doForgotUser, forgotPass: doForgotPass, verify: doVerify, resetPass: doResetPass };
   const fn = actions[authMode];
   const submit = document.getElementById('au-submit');
   if (submit && fn) submit.onclick = fn;
   authScreen.querySelectorAll('input').forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter' && fn) fn(); }));
   const on = (id, h) => { const el = document.getElementById(id); if (el) el.onclick = h; };
+  on('au-go-register', () => showAuth('register'));
+  on('au-go-login', () => showAuth('login'));
+  on('au-back-welcome', () => showAuth('welcome'));
   on('au-forgot-user', () => showAuth('forgotUser'));
   on('au-forgot-pass', () => showAuth('forgotPass'));
   on('au-back', () => showAuth('login'));
   on('au-resend', doResend);
-  const first = authScreen.querySelector('input'); if (first) first.focus();
+  const firstInput = authScreen.querySelector('input'); if (firstInput) firstInput.focus();
 }
 
 // Send a code & move to the verify screen. Returns false on email failure.
@@ -1220,7 +1237,7 @@ async function beginCode(purpose, email, payload, label) {
   return true;
 }
 
-async function doSetup() {
+async function doRegister() {
   const name = val('au-name').trim();
   const username = val('au-user').trim().toLowerCase();
   const email = val('au-email').trim();
@@ -1232,19 +1249,22 @@ async function doSetup() {
   if (pass.length < 4) return authErr('Нууц үг доод тал нь 4 тэмдэгт');
   if (pass !== pass2) return authErr('Нууц үг таарахгүй байна');
   if (!emailReady) initEmail();
-  if (!emailReady) { createAdmin({ name, username, email, pass }); return; } // offline fallback: no verification
-  await beginCode('setup', email, { name, username, email, pass }, 'Үргэлжлүүлэх');
+  if (!emailReady) { createAccount({ name, username, email, pass }); return; } // offline fallback: no verification
+  await beginCode('register', email, { name, username, email, pass }, 'Үргэлжлүүлэх');
 }
 
-async function createAdmin({ name, username, email, pass }) {
+async function createAccount({ name, username, email, pass }) {
+  const first = auth.users.length === 0;            // first account is the admin
   const salt = randSalt();
   const passHash = await hashPw(pass, salt);
-  const u = { id: uid(), username, name, email, salt, passHash, role: 'admin', perms: [...PERM_KEYS], createdAt: todayYmd() };
+  const u = { id: uid(), username, name, email, salt, passHash, role: first ? 'admin' : 'user', perms: [...PERM_KEYS], createdAt: todayYmd() };
   auth.users.push(u); saveAuth();
-  try {
-    const legacy = localStorage.getItem(LEGACY_DATA_KEY);
-    if (legacy && !localStorage.getItem(dataKey(u.id))) localStorage.setItem(dataKey(u.id), legacy);
-  } catch (e) { /* ignore */ }
+  if (first) {
+    try {
+      const legacy = localStorage.getItem(LEGACY_DATA_KEY);
+      if (legacy && !localStorage.getItem(dataKey(u.id))) localStorage.setItem(dataKey(u.id), legacy);
+    } catch (e) { /* ignore */ }
+  }
   enterApp(u);
 }
 
@@ -1284,8 +1304,8 @@ async function doVerify() {
     return authErr('Код буруу байна');
   }
   const p = pending; pending = null;
-  if (p.purpose === 'setup') {
-    await createAdmin(p.payload);
+  if (p.purpose === 'register') {
+    await createAccount(p.payload);
   } else if (p.purpose === 'forgotUser') {
     const names = auth.users.filter(x => (x.email || '').toLowerCase() === p.email.toLowerCase()).map(x => x.username).join(', ');
     authScreen.innerHTML = authShell('Нэвтрэх нэр олдлоо', 'Таны нэвтрэх нэр:', `
@@ -1723,11 +1743,10 @@ function migrateAuth() {
 function boot() {
   initEmail();
   migrateAuth();
-  if (auth.users.length === 0) { showAuth('setup'); return; }
   if (auth.currentUserId) {
     const u = auth.users.find(x => x.id === auth.currentUserId);
     if (u) { enterApp(u); return; }
   }
-  showAuth('login');
+  showAuth('welcome');
 }
 boot();

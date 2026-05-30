@@ -299,18 +299,18 @@ body {
 .cal-nav { background: var(--card); border: 1px solid var(--line); color: var(--text); width: 40px; height: 40px; border-radius: 12px; font-size: 22px; cursor: pointer; }
 .cal-weekdays { display: grid; grid-template-columns: repeat(7,1fr); gap: 4px; margin-bottom: 6px; }
 .cal-weekdays span { text-align: center; font-size: 11px; color: var(--muted); font-weight: 600; }
-.cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 4px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
 .cal-cell {
-  aspect-ratio: 1; border-radius: 12px; background: var(--card); border: 1px solid transparent;
+  height: 40px; border-radius: 9px; background: var(--card); border: 1px solid transparent;
   display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; position: relative;
-  font-size: 14px; font-weight: 600;
+  font-size: 13px; font-weight: 600;
 }
 .cal-cell.empty { background: transparent; cursor: default; }
 .cal-cell.today { border-color: var(--primary-2); }
-.cal-cell.selected { background: var(--primary); }
+.cal-cell.selected { background: var(--primary); color: #fff; }
 .cal-cell.other-month { opacity: 0.3; }
-.cal-dots { display: flex; gap: 2px; position: absolute; bottom: 6px; }
-.cal-dots i { width: 5px; height: 5px; border-radius: 50%; display: block; }
+.cal-dots { display: flex; gap: 2px; position: absolute; bottom: 4px; }
+.cal-dots i { width: 4px; height: 4px; border-radius: 50%; display: block; }
 .cal-day-detail { margin-top: 22px; }
 .cal-day-detail h3 { font-size: 15px; margin: 0 0 12px; }
 
@@ -333,6 +333,7 @@ body {
 .habit-card-head .hc-info { flex: 1; }
 .habit-card-head .hc-name { font-size: 16px; font-weight: 700; }
 .habit-card-head .hc-streak { font-size: 12px; color: var(--amber); font-weight: 600; margin-top: 2px; }
+.habit-card-head .hc-times { font-size: 12px; color: var(--primary-2); font-weight: 600; margin-top: 3px; }
 .habit-week { display: grid; grid-template-columns: repeat(7,1fr); gap: 6px; }
 .habit-day { text-align: center; }
 .habit-day .hd-wd { font-size: 10px; color: var(--muted); margin-bottom: 5px; }
@@ -434,6 +435,10 @@ body {
   padding: 9px 13px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .cat-pick button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.time-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.time-chip { background: var(--primary-tint); border: 1px solid var(--primary); color: var(--text); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.time-chip b { color: var(--muted); margin-left: 4px; font-weight: 700; }
+.time-add { background: var(--primary); color: #fff; border: none; border-radius: 12px; padding: 0 16px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .emoji-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .emoji-row button { width: 44px; height: 44px; font-size: 22px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
 .emoji-row button.active { border-color: var(--primary); background: var(--primary-tint); }

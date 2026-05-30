@@ -550,9 +550,10 @@ function habitCard(h, days, t) {
   card.className = 'habit-card';
   const head = document.createElement('div');
   head.className = 'habit-card-head';
+  const timesLine = (h.times && h.times.length) ? `<div class="hc-times">⏰ ${h.times.join(' · ')}</div>` : '';
   head.innerHTML = `<div class="hc-ico">${h.icon}</div>
     <div class="hc-info"><div class="hc-name">${esc(h.name)}</div>
-    <div class="hc-streak">🔥 ${streak(h)} өдөр ${neg ? 'тэвчсэн' : 'дараалан'}</div></div>
+    <div class="hc-streak">🔥 ${streak(h)} өдөр ${neg ? 'тэвчсэн' : 'дараалан'}</div>${timesLine}</div>
     <button class="task-del st-btn">📊</button>
     <button class="task-del">🗑</button>`;
   head.querySelector('.st-btn').onclick = () => openHabitStats(h);
@@ -682,6 +683,7 @@ const HABIT_ICONS = ['💧', '🏃', '📚', '🧘', '💪', '🥗', '😴', '�
 function openHabitModal() {
   modalTitle.textContent = 'Шинэ зуршил';
   let htype = 'positive';
+  let htimes = [];
   modalBody.innerHTML = `
     <div class="field"><label>Төрөл</label>
       <div class="seg" id="f-type">
@@ -691,7 +693,15 @@ function openHabitModal() {
       <div id="f-type-hint" style="font-size:12px;color:var(--muted);margin-top:7px">Хийсэн өдрийг тэмдэглэнэ (жишээ: ус уух, дасгал хийх)</div>
     </div>
     <div class="field"><label>Зуршлын нэр</label>
-      <input id="f-name" placeholder="Жишээ: Ус уух"/></div>
+      <input id="f-name" placeholder="Жишээ: Ам угаах"/></div>
+    <div class="field"><label>Сануулах цаг (заавал биш)</label>
+      <div class="time-chips" id="f-times"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input id="f-time-input" type="time" style="flex:1"/>
+        <button type="button" class="time-add" id="f-time-add">+ Цаг</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">Эдгээр цагт мэдэгдэл (reminder) ирнэ</div>
+    </div>
     <div class="field"><label>Дүрс сонгох</label>
       <div class="emoji-row" id="f-icon">
         ${HABIT_ICONS.map((e, i) => `<button data-v="${e}" class="${i === 0 ? 'active' : ''}">${e}</button>`).join('')}
@@ -704,11 +714,29 @@ function openHabitModal() {
       ? 'Тэвчсэн (хийгээгүй) өдрийг тэмдэглэнэ (жишээ: тамхи татахгүй, хурдан хоол идэхгүй)'
       : 'Хийсэн өдрийг тэмдэглэнэ (жишээ: ус уух, дасгал хийх)';
   });
+
+  function renderTimes() {
+    const c = document.getElementById('f-times');
+    c.innerHTML = htimes.length
+      ? htimes.map(t => `<span class="time-chip" data-t="${t}">🕐 ${t} <b>✕</b></span>`).join('')
+      : `<span style="color:var(--muted);font-size:13px">Цаг нэмээгүй</span>`;
+    c.querySelectorAll('.time-chip').forEach(ch => ch.onclick = () => {
+      htimes = htimes.filter(x => x !== ch.dataset.t); renderTimes();
+    });
+  }
+  renderTimes();
+  document.getElementById('f-time-add').onclick = () => {
+    const v = val('f-time-input');
+    if (!v) return;
+    if (!htimes.includes(v)) { htimes.push(v); htimes.sort(); renderTimes(); }
+  };
+
   document.getElementById('f-save').onclick = () => {
     const name = val('f-name').trim();
     if (!name) { toast('Нэр оруулна уу'); return; }
-    state.habits.push({ id: uid(), name, icon: emojiVal('f-icon'), type: htype, history: {} });
+    state.habits.push({ id: uid(), name, icon: emojiVal('f-icon'), type: htype, times: htimes, history: {} });
     save(); closeModal(); render(); toast('Зуршил нэмлээ');
+    if (htimes.length) requestNotifPermission();
   };
   openModal();
 }
@@ -1012,6 +1040,30 @@ function checkReminders() {
       if (currentView === 'reminders' || currentView === 'today') render();
     }
   });
+
+  // habit reminders — daily, at each configured time
+  state.habits.forEach(h => {
+    if (!h.times || h.times.indexOf(hhmm) === -1) return;
+    if (h.lastFired === minuteTag) return;
+    h.lastFired = minuteTag;
+    save();
+    fireHabitReminder(h);
+    if (currentView === 'habits' || currentView === 'today') render();
+  });
+}
+
+function fireHabitReminder(h) {
+  const title = '🔔 ' + h.name;
+  const body = h.type === 'negative' ? 'Тэвчих цагаа санаарай 💪' : 'Зуршлаа хийх цаг боллоо ✨';
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      const n = new Notification(title, { body, icon: 'icons/icon.svg', tag: 'habit-' + h.id, renotify: true });
+      n.onclick = () => { window.focus(); n.close(); };
+    } catch (e) { /* ignore */ }
+  }
+  beep();
+  toast(title);
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
 
 /* ============================================================

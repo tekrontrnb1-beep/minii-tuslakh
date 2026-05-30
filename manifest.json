@@ -1,32 +1,41 @@
 {
+  "id": "/minii-tuslakh/",
   "name": "Миний Туслах",
   "short_name": "Туслах",
-  "description": "Даалгавар, календар, зуршил, сэрүүлэг — өдөр тутмын хувийн туслах",
+  "description": "Даалгавар, календар, зуршил, сэрүүлэг, санхүү — өдөр тутмын хувийн туслах",
   "lang": "mn",
+  "dir": "ltr",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0f1020",
   "theme_color": "#6c5ce7",
+  "categories": ["productivity", "lifestyle", "utilities"],
   "icons": [
     {
       "src": "icons/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

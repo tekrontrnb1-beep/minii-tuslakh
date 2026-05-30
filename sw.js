@@ -1,5 +1,7 @@
-/* Service worker — offline cache for Миний Туслах */
-const CACHE = 'minii-tuslakh-v5';
+/* Service worker — Миний Туслах
+   Network-first for same-origin assets so updates appear immediately when
+   online; falls back to cache when offline. */
+const CACHE = 'minii-tuslakh-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -22,11 +24,18 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  if (url.origin !== location.origin) return; // let cross-origin (weather API) hit the network directly
+
+  // Network-first: always try fresh, cache it, fall back to cache when offline.
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+    fetch(e.request).then(res => {
       const copy = res.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
       return res;
-    }).catch(() => cached))
+    }).catch(() => caches.match(e.request).then(c => c || caches.match('./index.html')))
   );
 });
+
+// Allow the page to ask the waiting SW to take over immediately.
+self.addEventListener('message', (e) => { if (e.data === 'skipWaiting') self.skipWaiting(); });

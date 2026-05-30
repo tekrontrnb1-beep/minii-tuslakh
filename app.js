@@ -1213,9 +1213,20 @@ function seedIfEmpty() {
   save();
 }
 
-// Service worker for offline / installability
+// Service worker for offline / installability + auto-update
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  const hadController = !!navigator.serviceWorker.controller;
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    if (hadController) location.reload(); // reload once on UPDATE (not first install)
+  });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      reg.update && reg.update();
+    }).catch(() => {});
+  });
 }
 
 /* ---------- PWA install prompt ---------- */
@@ -1236,10 +1247,13 @@ function updateInstallBanner() {
     b.hidden = false;
   } else if (isiOS()) {
     btn.hidden = true;
-    sub.textContent = 'Доорх "Хуваалцах" (⬆️) → "Add to Home Screen" дарна уу';
+    sub.textContent = 'Safari доод талын "Хуваалцах" (⬆️) → "Add to Home Screen" дарна уу';
     b.hidden = false;
   } else {
-    b.hidden = true;
+    // Android/desktop where the auto-prompt has not fired — show manual steps
+    btn.hidden = true;
+    sub.textContent = 'Хөтчийн ⋮ цэс → "Install app / Add to Home screen" дарна уу';
+    b.hidden = false;
   }
 }
 

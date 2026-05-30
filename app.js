@@ -215,7 +215,7 @@ function renderToday() {
     state.habits.forEach(h => {
       const done = !!h.history[t];
       const el = document.createElement('div');
-      el.className = 'habit-chip' + (done ? ' done' : '');
+      el.className = 'habit-chip' + (done ? ' done' : '') + (h.type === 'negative' ? ' neg' : '');
       el.innerHTML = `<div class="hc-ico">${h.icon}</div>
         <div class="hc-name">${esc(h.name)}</div>
         <div class="hc-streak">🔥 ${streak(h)}</div>`;
@@ -529,38 +529,53 @@ function renderHabits() {
   for (let i = 6; i >= 0; i--) { const d = new Date(base); d.setDate(base.getDate() - i); days.push(d); }
   const t = todayYmd();
 
-  state.habits.forEach(h => {
-    const card = document.createElement('div');
-    card.className = 'habit-card';
+  const groups = [
+    { type: 'positive', title: '✅ Эерэг зуршил', sub: 'Хийсэн өдрийг тэмдэглэнэ' },
+    { type: 'negative', title: '🚫 Сөрөг зуршил', sub: 'Тэвчсэн өдрийг тэмдэглэнэ' },
+  ];
+  groups.forEach(g => {
+    const list = state.habits.filter(h => (h.type || 'positive') === g.type);
+    if (!list.length) return;
     const head = document.createElement('div');
-    head.className = 'habit-card-head';
-    head.innerHTML = `<div class="hc-ico">${h.icon}</div>
-      <div class="hc-info"><div class="hc-name">${esc(h.name)}</div>
-      <div class="hc-streak">🔥 ${streak(h)} өдөр дараалан</div></div>
-      <button class="task-del st-btn">📊</button>
-      <button class="task-del">🗑</button>`;
-    head.querySelector('.st-btn').onclick = () => openHabitStats(h);
-    head.querySelector('.task-del:not(.st-btn)').onclick = () => {
-      if (!confirm(`"${h.name}" зуршлыг устгах уу?`)) return;
-      state.habits = state.habits.filter(x => x.id !== h.id); save(); render(); toast('Зуршил устлаа');
-    };
-    card.appendChild(head);
-
-    const week = document.createElement('div');
-    week.className = 'habit-week';
-    days.forEach(d => {
-      const key = ymd(d);
-      const isFuture = key > t;
-      const box = document.createElement('div');
-      box.className = 'habit-day';
-      box.innerHTML = `<div class="hd-wd">${WD_SHORT[d.getDay()]}</div>
-        <div class="hd-box ${h.history[key] ? 'done' : ''} ${isFuture ? 'future' : ''} ${key === t ? 'today' : ''}">✓</div>`;
-      if (!isFuture) box.querySelector('.hd-box').onclick = () => toggleHabit(h.id, key);
-      week.appendChild(box);
-    });
-    card.appendChild(week);
-    cont.appendChild(card);
+    head.className = 'section-head';
+    head.innerHTML = `<h2 style="font-size:14px">${g.title}</h2><span style="font-size:11px;color:var(--muted)">${g.sub}</span>`;
+    cont.appendChild(head);
+    list.forEach(h => cont.appendChild(habitCard(h, days, t)));
   });
+}
+
+function habitCard(h, days, t) {
+  const neg = (h.type === 'negative');
+  const card = document.createElement('div');
+  card.className = 'habit-card';
+  const head = document.createElement('div');
+  head.className = 'habit-card-head';
+  head.innerHTML = `<div class="hc-ico">${h.icon}</div>
+    <div class="hc-info"><div class="hc-name">${esc(h.name)}</div>
+    <div class="hc-streak">🔥 ${streak(h)} өдөр ${neg ? 'тэвчсэн' : 'дараалан'}</div></div>
+    <button class="task-del st-btn">📊</button>
+    <button class="task-del">🗑</button>`;
+  head.querySelector('.st-btn').onclick = () => openHabitStats(h);
+  head.querySelector('.task-del:not(.st-btn)').onclick = () => {
+    if (!confirm(`"${h.name}" зуршлыг устгах уу?`)) return;
+    state.habits = state.habits.filter(x => x.id !== h.id); save(); render(); toast('Зуршил устлаа');
+  };
+  card.appendChild(head);
+
+  const week = document.createElement('div');
+  week.className = 'habit-week';
+  days.forEach(d => {
+    const key = ymd(d);
+    const isFuture = key > t;
+    const box = document.createElement('div');
+    box.className = 'habit-day';
+    box.innerHTML = `<div class="hd-wd">${WD_SHORT[d.getDay()]}</div>
+      <div class="hd-box ${h.history[key] ? 'done' : ''} ${neg ? 'neg' : ''} ${isFuture ? 'future' : ''} ${key === t ? 'today' : ''}">✓</div>`;
+    if (!isFuture) box.querySelector('.hd-box').onclick = () => toggleHabit(h.id, key);
+    week.appendChild(box);
+  });
+  card.appendChild(week);
+  return card;
 }
 
 /* ============================================================
@@ -663,10 +678,18 @@ function openTaskModal(task) {
 }
 
 /* ---- Habit modal ---- */
-const HABIT_ICONS = ['💧', '🏃', '📚', '🧘', '💪', '🥗', '😴', '🚭', '✍️', '🎯', '🧹', '💊'];
+const HABIT_ICONS = ['💧', '🏃', '📚', '🧘', '💪', '🥗', '😴', '✍️', '🎯', '🧹', '💊', '🚭', '🍔', '🍺', '📱', '🎮'];
 function openHabitModal() {
   modalTitle.textContent = 'Шинэ зуршил';
+  let htype = 'positive';
   modalBody.innerHTML = `
+    <div class="field"><label>Төрөл</label>
+      <div class="seg" id="f-type">
+        <button data-v="positive" class="active">✅ Эерэг</button>
+        <button data-v="negative">🚫 Сөрөг</button>
+      </div>
+      <div id="f-type-hint" style="font-size:12px;color:var(--muted);margin-top:7px">Хийсэн өдрийг тэмдэглэнэ (жишээ: ус уух, дасгал хийх)</div>
+    </div>
     <div class="field"><label>Зуршлын нэр</label>
       <input id="f-name" placeholder="Жишээ: Ус уух"/></div>
     <div class="field"><label>Дүрс сонгох</label>
@@ -675,10 +698,16 @@ function openHabitModal() {
       </div></div>
     <button class="btn-primary" id="f-save">Нэмэх</button>`;
   emojiHandler('f-icon');
+  segHandler('f-type', v => {
+    htype = v;
+    document.getElementById('f-type-hint').textContent = v === 'negative'
+      ? 'Тэвчсэн (хийгээгүй) өдрийг тэмдэглэнэ (жишээ: тамхи татахгүй, хурдан хоол идэхгүй)'
+      : 'Хийсэн өдрийг тэмдэглэнэ (жишээ: ус уух, дасгал хийх)';
+  });
   document.getElementById('f-save').onclick = () => {
     const name = val('f-name').trim();
     if (!name) { toast('Нэр оруулна уу'); return; }
-    state.habits.push({ id: uid(), name, icon: emojiVal('f-icon'), history: {} });
+    state.habits.push({ id: uid(), name, icon: emojiVal('f-icon'), type: htype, history: {} });
     save(); closeModal(); render(); toast('Зуршил нэмлээ');
   };
   openModal();
@@ -1355,7 +1384,7 @@ let engineStarted = false;
 function enterApp(u) {
   currentUser = u;
   auth.currentUserId = u.id; saveAuth();
-  state = load(); seedIfEmpty(); save();
+  state = load(); // new users start with a clean slate
   hideAuth();
   applyPermissions();
   updateAvatar();

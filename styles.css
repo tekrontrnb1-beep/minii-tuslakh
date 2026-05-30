@@ -322,6 +322,7 @@ body {
   padding: 14px; width: 92px; text-align: center; cursor: pointer;
 }
 .habit-chip.done { border-color: var(--green); background: rgba(0,214,143,0.12); }
+.habit-chip.neg.done { border-color: var(--blue); background: rgba(77,171,255,0.14); }
 .habit-chip .hc-ico { font-size: 26px; }
 .habit-chip .hc-name { font-size: 12px; margin-top: 6px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .habit-chip .hc-streak { font-size: 11px; color: var(--amber); margin-top: 4px; font-weight: 700; }
@@ -340,6 +341,7 @@ body {
   display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; color: transparent;
 }
 .habit-day .hd-box.done { background: var(--green); border-color: var(--green); color: #06251a; }
+.habit-day .hd-box.neg.done { background: var(--blue); border-color: var(--blue); color: #fff; }
 .habit-day .hd-box.future { opacity: 0.4; cursor: not-allowed; }
 .habit-day .hd-box.today { box-shadow: 0 0 0 2px var(--primary-2); }
 

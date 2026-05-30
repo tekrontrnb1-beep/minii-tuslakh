@@ -74,6 +74,24 @@ body {
 .stat-num { display: block; font-size: 24px; font-weight: 800; }
 .stat-label { font-size: 11px; color: rgba(255,255,255,0.85); }
 
+/* Install banner */
+.install-banner {
+  display: flex; align-items: center; gap: 12px;
+  background: linear-gradient(135deg, var(--primary) 0%, #4834b5 100%);
+  border-radius: var(--radius); padding: 14px 16px; margin: 6px 0 16px;
+  box-shadow: 0 8px 22px rgba(108,92,231,0.35);
+}
+.install-banner .ib-ico { font-size: 28px; }
+.install-banner .ib-main { flex: 1; min-width: 0; }
+.install-banner .ib-title { font-size: 15px; font-weight: 800; }
+.install-banner .ib-sub { font-size: 12px; color: rgba(255,255,255,0.85); margin-top: 2px; }
+.install-banner .ib-btn {
+  background: #fff; color: var(--primary); border: none; border-radius: 10px;
+  padding: 9px 16px; font-weight: 800; font-size: 13px; cursor: pointer; white-space: nowrap;
+}
+.install-banner .ib-btn:active { transform: scale(0.95); }
+.install-banner .ib-close { background: none; border: none; color: rgba(255,255,255,0.7); font-size: 15px; cursor: pointer; padding: 4px; }
+
 /* Weather card */
 .weather-card {
   background: linear-gradient(135deg, #2b6fb3 0%, #1b3a63 100%);

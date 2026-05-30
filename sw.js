@@ -1,5 +1,5 @@
 /* Service worker — offline cache for Миний Туслах */
-const CACHE = 'minii-tuslakh-v4';
+const CACHE = 'minii-tuslakh-v5';
 const ASSETS = [
   './',
   './index.html',

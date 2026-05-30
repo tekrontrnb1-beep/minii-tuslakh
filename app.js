@@ -911,6 +911,7 @@ function enterApp(u) {
   applyPermissions();
   updateAvatar();
   switchView('today');
+  updateInstallBanner();
   startEngine();
 }
 function startEngine() {
@@ -1216,6 +1217,52 @@ function seedIfEmpty() {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
+
+/* ---------- PWA install prompt ---------- */
+let deferredInstall = null;
+let installDismissed = false;
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+const isiOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+function updateInstallBanner() {
+  const b = document.getElementById('install-banner');
+  if (!b || !currentUser) { if (b) b.hidden = true; return; }
+  if (isStandalone() || installDismissed) { b.hidden = true; return; }
+  const btn = document.getElementById('ib-install');
+  const sub = document.getElementById('ib-sub');
+  if (deferredInstall) {
+    btn.hidden = false;
+    sub.textContent = 'Үндсэн дэлгэцэд нэмж, тусдаа апп болгон ашиглаарай';
+    b.hidden = false;
+  } else if (isiOS()) {
+    btn.hidden = true;
+    sub.textContent = 'Доорх "Хуваалцах" (⬆️) → "Add to Home Screen" дарна уу';
+    b.hidden = false;
+  } else {
+    b.hidden = true;
+  }
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstall = e;
+  updateInstallBanner();
+});
+window.addEventListener('appinstalled', () => {
+  deferredInstall = null;
+  const b = document.getElementById('install-banner');
+  if (b) b.hidden = true;
+  toast('✅ Апп амжилттай суулгагдлаа');
+});
+
+document.getElementById('ib-install').onclick = async () => {
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  try { await deferredInstall.userChoice; } catch (e) { /* ignore */ }
+  deferredInstall = null;
+  updateInstallBanner();
+};
+document.getElementById('ib-close').onclick = () => { installDismissed = true; updateInstallBanner(); };
 
 // Recalc on resume / focus (only when logged in)
 document.addEventListener('visibilitychange', () => {

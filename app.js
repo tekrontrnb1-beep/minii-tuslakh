@@ -1102,53 +1102,145 @@ function renderTodayFinance() {
    ============================================================ */
 const authScreen = document.getElementById('auth-screen');
 let authMode = 'login';
+let pending = null;     // code flow: { code, email, purpose, payload, expiresAt, tries }
+let resetUserId = null; // user being password-reset
 
-function showAuth(mode) {
-  authMode = mode;
-  renderAuth();
-  authScreen.hidden = false;
-  document.body.style.overflow = 'hidden';
+/* ---- EmailJS (verification codes to Gmail) ---- */
+const EMAILJS = { publicKey: 'fTMJ10XivkfekTjgO', serviceId: 'service_9pm7lci', templateId: 'template_gjeprlk' };
+let emailReady = false;
+function initEmail() {
+  try { if (window.emailjs) { emailjs.init({ publicKey: EMAILJS.publicKey }); emailReady = true; } } catch (e) { emailReady = false; }
 }
+function isEmail(s) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s); }
+function genCode() { const a = new Uint32Array(1); crypto.getRandomValues(a); return String(a[0] % 1000000).padStart(6, '0'); }
+function maskEmail(e) {
+  const [n, d] = String(e).split('@'); if (!d) return e;
+  return (n.length <= 2 ? n[0] : n.slice(0, 2)) + '***@' + d;
+}
+async function emailCode(email, code) {
+  const exp = new Date(Date.now() + 15 * 60000);
+  const time = `${String(exp.getHours()).padStart(2, '0')}:${String(exp.getMinutes()).padStart(2, '0')}`;
+  await emailjs.send(EMAILJS.serviceId, EMAILJS.templateId, { email, to_email: email, passcode: code, time, to_name: '' });
+}
+
+function showAuth(mode) { authMode = mode; pending = null; renderAuth(); authScreen.hidden = false; document.body.style.overflow = 'hidden'; }
 function hideAuth() { authScreen.hidden = true; document.body.style.overflow = ''; }
 
-function renderAuth(err) {
-  const setup = authMode === 'setup';
-  authScreen.innerHTML = `
-    <div class="auth-box">
-      <div class="auth-logo">
-        <div class="al-ico">🗂️</div>
-        <h2>Миний Туслах</h2>
-        <p>${setup ? 'Эхний админ хэрэглэгчээ үүсгэнэ үү' : 'Тавтай морил! Нэвтэрнэ үү'}</p>
-      </div>
-      <div class="auth-card">
-        <h3>${setup ? 'Бүртгэл үүсгэх' : 'Нэвтрэх'}</h3>
-        ${err ? `<div class="auth-error">⚠️ ${esc(err)}</div>` : ''}
-        ${setup ? `<div class="field"><label>Нэр</label><input id="au-name" placeholder="Таны нэр"/></div>` : ''}
-        <div class="field"><label>Хэрэглэгчийн нэр</label><input id="au-user" placeholder="username" autocapitalize="off" autocomplete="username"/></div>
-        <div class="field"><label>Нууц үг</label><input id="au-pass" type="password" placeholder="••••••" autocomplete="${setup ? 'new-password' : 'current-password'}"/></div>
-        ${setup ? `<div class="field"><label>Нууц үг давтах</label><input id="au-pass2" type="password" placeholder="••••••"/></div>` : ''}
-        <button class="btn-primary" id="au-submit">${setup ? 'Үүсгэх' : 'Нэвтрэх'}</button>
-      </div>
-    </div>`;
-  const submit = setup ? doSetup : doLogin;
-  document.getElementById('au-submit').onclick = submit;
-  authScreen.querySelectorAll('input').forEach(i =>
-    i.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); }));
+function authShell(title, sub, body) {
+  return `<div class="auth-box">
+    <div class="auth-logo"><div class="al-ico">🗂️</div><h2>Миний Туслах</h2><p>${sub}</p></div>
+    <div class="auth-card"><h3>${title}</h3><div id="auth-err-slot"></div>${body}</div>
+  </div>`;
+}
+function authErr(msg) {
+  const slot = document.getElementById('auth-err-slot');
+  if (slot) slot.innerHTML = msg ? `<div class="auth-error">⚠️ ${esc(msg)}</div>` : '';
+}
+function setBusy(on, label) {
+  const b = document.getElementById('au-submit');
+  if (b) { b.disabled = on; b.textContent = on ? 'Түр хүлээнэ үү...' : label; }
+}
+
+function renderAuth() {
+  const forms = {
+    setup: authSetupForm, login: authLoginForm, forgotUser: authForgotUserForm,
+    forgotPass: authForgotPassForm, verify: authVerifyForm, resetPass: authResetPassForm,
+  };
+  authScreen.innerHTML = (forms[authMode] || authLoginForm)();
+  wireAuth();
+}
+
+function authSetupForm() {
+  return authShell('Бүртгэл үүсгэх', 'Эхний админ бүртгэлээ үүсгэнэ үү', `
+    <div class="field"><label>Нэр</label><input id="au-name" placeholder="Таны нэр"/></div>
+    <div class="field"><label>Хэрэглэгчийн нэр</label><input id="au-user" placeholder="username" autocapitalize="off"/></div>
+    <div class="field"><label>Gmail хаяг</label><input id="au-email" type="email" placeholder="name@gmail.com" autocapitalize="off"/></div>
+    <div class="field"><label>Нууц үг</label><input id="au-pass" type="password" placeholder="••••••"/></div>
+    <div class="field"><label>Нууц үг давтах</label><input id="au-pass2" type="password" placeholder="••••••"/></div>
+    <button class="btn-primary" id="au-submit">Үргэлжлүүлэх</button>`);
+}
+function authLoginForm() {
+  return authShell('Нэвтрэх', 'Тавтай морил!', `
+    <div class="field"><label>Хэрэглэгчийн нэр</label><input id="au-user" placeholder="username" autocapitalize="off"/></div>
+    <div class="field"><label>Нууц үг</label><input id="au-pass" type="password" placeholder="••••••"/></div>
+    <button class="btn-primary" id="au-submit">Нэвтрэх</button>
+    <div class="auth-switch"><button id="au-forgot-user">Нэвтрэх нэр?</button> · <button id="au-forgot-pass">Нууц үг мартсан?</button></div>`);
+}
+function authForgotUserForm() {
+  return authShell('Нэвтрэх нэр сэргээх', 'Бүртгэлтэй Gmail хаягаа оруулна уу', `
+    <div class="field"><label>Gmail хаяг</label><input id="au-email" type="email" placeholder="name@gmail.com" autocapitalize="off"/></div>
+    <button class="btn-primary" id="au-submit">Код илгээх</button>
+    <div class="auth-switch"><button id="au-back">← Нэвтрэх рүү буцах</button></div>`);
+}
+function authForgotPassForm() {
+  return authShell('Нууц үг сэргээх', 'Нэвтрэх нэр эсвэл Gmail хаягаа оруулна уу', `
+    <div class="field"><label>Нэвтрэх нэр эсвэл Gmail</label><input id="au-id" placeholder="username эсвэл name@gmail.com" autocapitalize="off"/></div>
+    <button class="btn-primary" id="au-submit">Код илгээх</button>
+    <div class="auth-switch"><button id="au-back">← Нэвтрэх рүү буцах</button></div>`);
+}
+function authVerifyForm() {
+  const masked = pending ? maskEmail(pending.email) : '';
+  return authShell('Кодоо оруулна уу', `${masked} хаяг руу илгээсэн 6 оронтой код`, `
+    <div class="field"><label>Баталгаажуулах код</label>
+      <input id="au-code" inputmode="numeric" maxlength="6" placeholder="000000" style="letter-spacing:8px;text-align:center;font-size:24px"/></div>
+    <button class="btn-primary" id="au-submit">Баталгаажуулах</button>
+    <div class="auth-switch"><button id="au-resend">Код дахин илгээх</button> · <button id="au-back">← Буцах</button></div>`);
+}
+function authResetPassForm() {
+  return authShell('Шинэ нууц үг', 'Шинэ нууц үгээ тохируулна уу', `
+    <div class="field"><label>Шинэ нууц үг</label><input id="au-pass" type="password" placeholder="••••••"/></div>
+    <div class="field"><label>Шинэ нууц үг давтах</label><input id="au-pass2" type="password" placeholder="••••••"/></div>
+    <button class="btn-primary" id="au-submit">Хадгалах</button>`);
+}
+
+function wireAuth() {
+  const actions = { setup: doSetup, login: doLogin, forgotUser: doForgotUser, forgotPass: doForgotPass, verify: doVerify, resetPass: doResetPass };
+  const fn = actions[authMode];
+  const submit = document.getElementById('au-submit');
+  if (submit && fn) submit.onclick = fn;
+  authScreen.querySelectorAll('input').forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter' && fn) fn(); }));
+  const on = (id, h) => { const el = document.getElementById(id); if (el) el.onclick = h; };
+  on('au-forgot-user', () => showAuth('forgotUser'));
+  on('au-forgot-pass', () => showAuth('forgotPass'));
+  on('au-back', () => showAuth('login'));
+  on('au-resend', doResend);
+  const first = authScreen.querySelector('input'); if (first) first.focus();
+}
+
+// Send a code & move to the verify screen. Returns false on email failure.
+async function beginCode(purpose, email, payload, label) {
+  if (!emailReady) initEmail();
+  if (!emailReady) { authErr('Имэйл үйлчилгээ ачаалагдсангүй. Интернэтээ шалгаад дахин оролдоно уу.'); return false; }
+  setBusy(true, label);
+  const code = genCode();
+  try { await emailCode(email, code); }
+  catch (e) { setBusy(false, label); authErr('Имэйл илгээхэд алдаа гарлаа. Интернэт болон хаягаа шалгана уу.'); return false; }
+  pending = { code, email, purpose, payload, expiresAt: Date.now() + 15 * 60000, tries: 0 };
+  authMode = 'verify'; renderAuth();
+  return true;
 }
 
 async function doSetup() {
   const name = val('au-name').trim();
   const username = val('au-user').trim().toLowerCase();
+  const email = val('au-email').trim();
   const pass = val('au-pass'), pass2 = val('au-pass2');
-  if (!name) return renderAuth('Нэрээ оруулна уу');
-  if (username.length < 3) return renderAuth('Хэрэглэгчийн нэр доод тал нь 3 тэмдэгт');
-  if (pass.length < 4) return renderAuth('Нууц үг доод тал нь 4 тэмдэгт');
-  if (pass !== pass2) return renderAuth('Нууц үг таарахгүй байна');
+  if (!name) return authErr('Нэрээ оруулна уу');
+  if (username.length < 3) return authErr('Хэрэглэгчийн нэр доод тал нь 3 тэмдэгт');
+  if (auth.users.some(u => u.username === username)) return authErr('Энэ нэр бүртгэлтэй байна');
+  if (!isEmail(email)) return authErr('Зөв Gmail хаяг оруулна уу');
+  if (pass.length < 4) return authErr('Нууц үг доод тал нь 4 тэмдэгт');
+  if (pass !== pass2) return authErr('Нууц үг таарахгүй байна');
+  if (!emailReady) initEmail();
+  if (!emailReady) { createAdmin({ name, username, email, pass }); return; } // offline fallback: no verification
+  await beginCode('setup', email, { name, username, email, pass }, 'Үргэлжлүүлэх');
+}
+
+async function createAdmin({ name, username, email, pass }) {
   const salt = randSalt();
   const passHash = await hashPw(pass, salt);
-  const u = { id: uid(), username, name, salt, passHash, role: 'admin', perms: [...PERM_KEYS], createdAt: todayYmd() };
+  const u = { id: uid(), username, name, email, salt, passHash, role: 'admin', perms: [...PERM_KEYS], createdAt: todayYmd() };
   auth.users.push(u); saveAuth();
-  // migrate any pre-auth data to the first admin
   try {
     const legacy = localStorage.getItem(LEGACY_DATA_KEY);
     if (legacy && !localStorage.getItem(dataKey(u.id))) localStorage.setItem(dataKey(u.id), legacy);
@@ -1160,10 +1252,72 @@ async function doLogin() {
   const username = val('au-user').trim().toLowerCase();
   const pass = val('au-pass');
   const u = auth.users.find(x => x.username === username);
-  if (!u) return renderAuth('Хэрэглэгч олдсонгүй');
+  if (!u) return authErr('Хэрэглэгч олдсонгүй');
   const h = await hashPw(pass, u.salt);
-  if (h !== u.passHash) return renderAuth('Нууц үг буруу байна');
+  if (h !== u.passHash) return authErr('Нууц үг буруу байна');
   enterApp(u);
+}
+
+async function doForgotUser() {
+  const email = val('au-email').trim().toLowerCase();
+  if (!isEmail(email)) return authErr('Зөв Gmail хаяг оруулна уу');
+  if (!auth.users.some(u => (u.email || '').toLowerCase() === email)) return authErr('Энэ хаягаар бүртгэл олдсонгүй');
+  await beginCode('forgotUser', email, { email }, 'Код илгээх');
+}
+
+async function doForgotPass() {
+  const idv = val('au-id').trim().toLowerCase();
+  if (!idv) return authErr('Нэвтрэх нэр эсвэл Gmail оруулна уу');
+  const u = auth.users.find(x => x.username === idv || (x.email || '').toLowerCase() === idv);
+  if (!u) return authErr('Бүртгэл олдсонгүй');
+  if (!u.email || !isEmail(u.email)) return authErr('Энэ бүртгэлд Gmail хаяг байхгүй тул сэргээх боломжгүй');
+  await beginCode('forgotPass', u.email, { userId: u.id }, 'Код илгээх');
+}
+
+async function doVerify() {
+  if (!pending) return showAuth('login');
+  const entered = val('au-code').trim();
+  if (Date.now() > pending.expiresAt) return authErr('Кодын хугацаа дууссан. Дахин илгээнэ үү.');
+  if (entered !== pending.code) {
+    pending.tries++;
+    if (pending.tries >= 5) { pending = null; toast('Хэт олон удаа буруу'); return showAuth('login'); }
+    return authErr('Код буруу байна');
+  }
+  const p = pending; pending = null;
+  if (p.purpose === 'setup') {
+    await createAdmin(p.payload);
+  } else if (p.purpose === 'forgotUser') {
+    const names = auth.users.filter(x => (x.email || '').toLowerCase() === p.email.toLowerCase()).map(x => x.username).join(', ');
+    authScreen.innerHTML = authShell('Нэвтрэх нэр олдлоо', 'Таны нэвтрэх нэр:', `
+      <div style="text-align:center;font-size:22px;font-weight:800;margin:6px 0 18px;color:var(--primary-2)">${esc(names)}</div>
+      <button class="btn-primary" id="au-submit">Нэвтрэх</button>`);
+    document.getElementById('au-submit').onclick = () => showAuth('login');
+  } else if (p.purpose === 'forgotPass') {
+    resetUserId = p.payload.userId;
+    authMode = 'resetPass'; renderAuth();
+  }
+}
+
+async function doResetPass() {
+  const pass = val('au-pass'), pass2 = val('au-pass2');
+  if (pass.length < 4) return authErr('Нууц үг доод тал нь 4 тэмдэгт');
+  if (pass !== pass2) return authErr('Нууц үг таарахгүй байна');
+  const u = auth.users.find(x => x.id === resetUserId);
+  if (!u) return showAuth('login');
+  u.salt = randSalt(); u.passHash = await hashPw(pass, u.salt);
+  saveAuth(); resetUserId = null;
+  authScreen.innerHTML = authShell('Болсон ✅', 'Нууц үг амжилттай шинэчлэгдлээ', `<button class="btn-primary" id="au-submit">Нэвтрэх</button>`);
+  document.getElementById('au-submit').onclick = () => showAuth('login');
+}
+
+async function doResend() {
+  if (!pending) return;
+  setBusy(true, 'Баталгаажуулах');
+  const code = genCode();
+  try { await emailCode(pending.email, code); }
+  catch (e) { setBusy(false, 'Баталгаажуулах'); return authErr('Илгээхэд алдаа гарлаа'); }
+  pending.code = code; pending.expiresAt = Date.now() + 15 * 60000; pending.tries = 0;
+  setBusy(false, 'Баталгаажуулах'); authErr(''); toast('Код дахин илгээлээ');
 }
 
 /* ---------- Enter / leave the app ---------- */
@@ -1217,7 +1371,7 @@ function renderProfile() {
     <div class="profile-card">
       <div class="pc-avatar">${initials(u.name)}</div>
       <div class="pc-name">${esc(u.name)}</div>
-      <div class="pc-user">@${esc(u.username)}</div>
+      <div class="pc-user">@${esc(u.username)}${u.email ? ' · 📧 ' + esc(u.email) : ''}</div>
       <span class="role-badge ${isAdmin ? 'role-admin' : 'role-user'}">${isAdmin ? '👑 Админ' : 'Хэрэглэгч'}</span>
     </div>
     <div class="settings-group">
@@ -1356,6 +1510,7 @@ function openUserModal(user) {
   modalBody.innerHTML = `
     <div class="field"><label>Нэр</label><input id="us-name" value="${editing ? esc(user.name) : ''}" placeholder="Нэр"/></div>
     <div class="field"><label>Хэрэглэгчийн нэр</label><input id="us-user" value="${editing ? esc(user.username) : ''}" ${editing ? 'disabled' : ''} autocapitalize="off" placeholder="username"/></div>
+    <div class="field"><label>Gmail хаяг (нууц үг сэргээхэд)</label><input id="us-email" type="email" value="${editing ? esc(user.email || '') : ''}" autocapitalize="off" placeholder="name@gmail.com"/></div>
     ${editing ? '' : `<div class="field"><label>Нууц үг</label><input id="us-pass" type="password" placeholder="••••••"/></div>`}
     <div class="field"><label>Эрхийн төрөл</label>
       <div class="seg" id="us-role">
@@ -1389,12 +1544,14 @@ function openUserModal(user) {
 
   document.getElementById('us-save').onclick = async () => {
     const name = val('us-name').trim();
+    const email = val('us-email').trim();
     if (!name) { toast('Нэр оруулна уу'); return; }
+    if (email && !isEmail(email)) { toast('Зөв Gmail хаяг оруулна уу'); return; }
     if (editing) {
       // guard: do not demote the last admin
       const adminCount = auth.users.filter(u => u.role === 'admin').length;
       if (user.role === 'admin' && role !== 'admin' && adminCount <= 1) { toast('Сүүлчийн админыг бууруулж болохгүй'); return; }
-      user.name = name; user.role = role;
+      user.name = name; user.role = role; user.email = email;
       user.perms = role === 'admin' ? [...PERM_KEYS] : perms;
       saveAuth(); closeModal();
       if (isSelf) { applyPermissions(); updateAvatar(); }
@@ -1406,7 +1563,7 @@ function openUserModal(user) {
       if (auth.users.some(u => u.username === username)) { toast('Энэ нэр бүртгэлтэй байна'); return; }
       if (pass.length < 4) { toast('Нууц үг доод тал нь 4 тэмдэгт'); return; }
       const salt = randSalt(); const passHash = await hashPw(pass, salt);
-      auth.users.push({ id: uid(), username, name, salt, passHash, role, perms: role === 'admin' ? [...PERM_KEYS] : perms, createdAt: todayYmd() });
+      auth.users.push({ id: uid(), username, name, email, salt, passHash, role, perms: role === 'admin' ? [...PERM_KEYS] : perms, createdAt: todayYmd() });
       saveAuth(); closeModal(); render(); toast('Хэрэглэгч нэмлээ');
     }
   };
@@ -1564,6 +1721,7 @@ function migrateAuth() {
 }
 
 function boot() {
+  initEmail();
   migrateAuth();
   if (auth.users.length === 0) { showAuth('setup'); return; }
   if (auth.currentUserId) {

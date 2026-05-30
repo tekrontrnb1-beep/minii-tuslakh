@@ -1190,49 +1190,62 @@ function fireReminder(r) {
   ]);
 }
 
-// Check every 20s for due reminders
+// Checked frequently (every 5s) + on focus. GRACE catches alarms that were
+// missed while the app/phone was asleep, so they still ring shortly after.
+const GRACE_MIN = 5;
 function checkReminders() {
+  // never stack a new alarm on top of one that is already ringing
+  const overlay = document.getElementById('alarm-overlay');
+  if (overlay && !overlay.hidden) return;
+
   const now = new Date();
   const nowKey = ymd(now);
-  const hhmm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-  const minuteTag = nowKey + ' ' + hhmm;
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const toMin = (t) => { const p = String(t).split(':'); return (+p[0]) * 60 + (+p[1]); };
 
-  state.reminders.forEach(r => {
-    if (!r.enabled || r.time !== hhmm) return;
-    if (r.lastFired === minuteTag) return;            // already fired this minute
+  for (const r of state.reminders) {
+    if (!r.enabled || !r.time) continue;
+    const lateBy = nowMin - toMin(r.time);
+    if (lateBy < 0 || lateBy > GRACE_MIN) continue;     // not due yet, or too stale
+    const tag = nowKey + ' ' + r.time;
+    if (r.lastFired === tag) continue;                  // already fired this occurrence today
 
     let due = false;
     if (r.repeat === 'daily') due = true;
     else if (r.repeat === 'weekly') {
-      // weekly anchored to its creation/edit weekday is complex; fire same weekday as today's match — simple: every 7 days from date if set, else any matching weekday
-      due = true; // fire weekly on the configured weekday
+      due = true;
       if (r.date) {
-        const anchor = parseYmd(r.date);
-        const diffDays = Math.round((parseYmd(nowKey) - anchor) / 86400000);
+        const diffDays = Math.round((parseYmd(nowKey) - parseYmd(r.date)) / 86400000);
         due = diffDays >= 0 && diffDays % 7 === 0;
       }
-    } else { // none
+    } else { // none (one-time)
       due = r.date === nowKey;
     }
+    if (!due) continue;
 
-    if (due) {
-      r.lastFired = minuteTag;
-      if (r.repeat === 'none') r.enabled = false; // one-shot auto-off
-      save();
-      fireReminder(r);
-      if (currentView === 'reminders' || currentView === 'today') render();
-    }
-  });
-
-  // habit reminders — daily, at each configured time
-  state.habits.forEach(h => {
-    if (!h.times || h.times.indexOf(hhmm) === -1) return;
-    if (h.lastFired === minuteTag) return;
-    h.lastFired = minuteTag;
+    r.lastFired = tag;
+    if (r.repeat === 'none') r.enabled = false; // one-shot auto-off
     save();
-    fireHabitReminder(h);
-    if (currentView === 'habits' || currentView === 'today') render();
-  });
+    if (currentView === 'reminders' || currentView === 'today') render();
+    fireReminder(r);
+    return; // one alarm at a time
+  }
+
+  // habit reminders — at each configured time of day
+  for (const h of state.habits) {
+    if (!h.times || !h.times.length) continue;
+    for (const t of h.times) {
+      const lateBy = nowMin - toMin(t);
+      if (lateBy < 0 || lateBy > GRACE_MIN) continue;
+      const tag = nowKey + ' ' + t;
+      if (h.lastFired === tag) continue;
+      h.lastFired = tag;
+      save();
+      if (currentView === 'habits' || currentView === 'today') render();
+      fireHabitReminder(h);
+      return; // one alarm at a time
+    }
+  }
 }
 
 function fireHabitReminder(h) {
@@ -1635,7 +1648,7 @@ function startEngine() {
   if (engineStarted) return;
   engineStarted = true;
   checkReminders();
-  setInterval(checkReminders, 20000);
+  setInterval(checkReminders, 5000);
 }
 function logout() {
   auth.currentUserId = null; saveAuth();

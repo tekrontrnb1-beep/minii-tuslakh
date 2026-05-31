@@ -1,7 +1,7 @@
 /* Service worker — Tekron Support
    Network-first for same-origin assets so updates appear immediately when
    online; falls back to cache when offline. */
-const CACHE = 'minii-tuslakh-v25';
+const CACHE = 'minii-tuslakh-v26';
 const ASSETS = [
   './',
   './index.html',

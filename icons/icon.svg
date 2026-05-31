@@ -5,14 +5,6 @@
       <stop offset="1" stop-color="#4834b5"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <!-- checkmark / list motif -->
-  <g fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M150 180 l30 30 l55 -60"/>
-    <line x1="285" y1="180" x2="380" y2="180"/>
-    <path d="M150 290 l30 30 l55 -60"/>
-    <line x1="285" y1="290" x2="380" y2="290"/>
-    <circle cx="178" cy="395" r="6" fill="#ffffff"/>
-    <line x1="285" y1="395" x2="380" y2="395"/>
-  </g>
+  <rect width="512" height="512" rx="104" fill="url(#bg)"/>
+  <text x="256" y="262" font-family="Segoe UI, Roboto, Arial, sans-serif" font-size="232" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="central" letter-spacing="-6">TS</text>
 </svg>

@@ -1419,7 +1419,7 @@ function hideAuth() { authScreen.hidden = true; document.body.style.overflow = '
 
 function authShell(title, sub, body) {
   return `<div class="auth-box">
-    <div class="auth-logo"><div class="al-ico">🗂️</div><h2>Миний Туслах</h2><p>${sub}</p></div>
+    <div class="auth-logo"><div class="al-ico">TS</div><h2>Tekron Support</h2><p>${sub}</p></div>
     <div class="auth-card"><h3>${title}</h3><div id="auth-err-slot"></div>${body}</div>
   </div>`;
 }
@@ -1444,7 +1444,7 @@ function renderAuth() {
 
 function authWelcomeForm() {
   return `<div class="auth-box">
-    <div class="auth-logo"><div class="al-ico">🗂️</div><h2>Миний Туслах</h2>
+    <div class="auth-logo"><div class="al-ico">TS</div><h2>Tekron Support</h2>
       <p>Өдөр тутмын хувийн туслах</p></div>
     <div class="auth-card">
       <button class="btn-primary" id="au-go-register">📝 Шинээр бүртгүүлэх</button>

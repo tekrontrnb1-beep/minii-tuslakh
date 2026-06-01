@@ -4,6 +4,9 @@
 # Exported user backups (contain personal data)
 minii-tuslakh-*.json
 
+# Generated share QR (local convenience asset)
+tekron-support-qr.png
+
 # OS files
 Thumbs.db
 desktop.ini
